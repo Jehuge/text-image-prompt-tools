@@ -12,7 +12,7 @@ export interface MessageTemplate {
 export interface TemplateMetadata {
   version: string;
   lastModified: number;
-  templateType: 'text2image' | 'image2image' | 'image2prompt';
+  templateType: 'text2image' | 'image2image' | 'image2prompt' | 'optimize' | 'iterate' | 'userOptimize' | 'text2imageOptimize' | 'image2imageOptimize';
   language: 'zh' | 'en';
 }
 

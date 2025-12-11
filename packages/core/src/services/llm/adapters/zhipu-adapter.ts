@@ -106,18 +106,19 @@ export class ZhipuAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || ZHIPU_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {
       console.log('[ZhipuAdapter] 开始获取模型列表...');
       const response = await client.models.list();
       console.log(`[ZhipuAdapter] API 返回 ${response.data.length} 个模型`);
-      
+
       // 只返回真实从 API 获取的模型
       const dynamicModels = response.data.map((model) => {
         // 从真实 API 返回的模型 ID 中判断视觉支持
         const supportsVision = model.id.includes('glm-4') && !model.id.includes('air');
-        
+
         return {
           id: model.id,
           name: model.id,
@@ -130,9 +131,9 @@ export class ZhipuAdapter implements ITextProviderAdapter {
           },
         };
       });
-      
+
       console.log(`[ZhipuAdapter] 从真实 API 获取 ${dynamicModels.length} 个模型`);
-      
+
       // 只返回真实获取的模型，不合并静态模型
       return dynamicModels;
     } catch (error) {
@@ -163,6 +164,7 @@ export class ZhipuAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || ZHIPU_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     const response = await client.chat.completions.create({
@@ -183,10 +185,10 @@ export class ZhipuAdapter implements ITextProviderAdapter {
       content: choice.message.content || '',
       usage: response.usage
         ? {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens,
+        }
         : undefined,
     };
   }
@@ -199,6 +201,7 @@ export class ZhipuAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || ZHIPU_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {

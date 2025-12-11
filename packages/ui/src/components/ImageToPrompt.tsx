@@ -1,24 +1,41 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useImageToPrompt } from '../hooks/useImageToPrompt';
 import { ModelSelector } from './ModelSelector';
+import { TemplateSelector } from './TemplateSelector';
+
+export interface TemplateOption {
+  id: string;
+  name: string;
+  language: 'zh' | 'en';
+}
 
 export interface ImageToPromptProps {
   defaultModel?: string;
+  defaultTemplateId?: string;
   onExtracted?: (prompt: string) => void;
   availableModels?: Array<{ id: string; name: string }>;
+  availableTemplates?: TemplateOption[];
+  templateManager?: any; // ITemplateManager 类型，但为了避免循环依赖使用 any
 }
 
 
 export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
   defaultModel = '',
+  defaultTemplateId,
   onExtracted,
   availableModels = [],
+  availableTemplates = [],
+  templateManager,
 }) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [model, setModel] = useState(defaultModel);
+  const [templateId, setTemplateId] = useState<string | undefined>(defaultTemplateId);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { extract, loading, error, result } = useImageToPrompt();
+
+  // 过滤中文模板
+  const chineseTemplates = availableTemplates.filter(t => t.language === 'zh');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -41,7 +58,7 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
       alert('请先选择模型');
       return;
     }
-    const prompt = await extract(imagePreview, model);
+    const prompt = await extract(imagePreview, model, templateId);
     if (prompt && onExtracted) {
       onExtracted(prompt);
     }
@@ -74,6 +91,20 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
             storageKey="selectedImageModel"
           />
         </div>
+
+        {/* Template Selection */}
+        {chineseTemplates.length > 0 && (
+          <div className="p-4 border-b border-gray-200 bg-white">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">选择反推模板</label>
+            <TemplateSelector
+              value={templateId}
+              onChange={setTemplateId}
+              availableTemplates={chineseTemplates}
+              templateManager={templateManager}
+              placeholder="使用默认模板"
+            />
+          </div>
+        )}
         
         <div className="flex-1 p-6 flex flex-col items-center justify-center bg-white min-h-0">
           <input 

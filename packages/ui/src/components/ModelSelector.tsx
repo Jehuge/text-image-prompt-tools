@@ -200,12 +200,19 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
             if (!trimmedModelId) return;
             
+            // 规则：以用户保存的模型ID为准；仅在缺少 provider 前缀且不含路径/冒号时补前缀
+            const hasProviderPrefix = trimmedModelId.startsWith(`${providerId}-`);
+            const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':');
+            const optionId = hasProviderPrefix || hasPathOrAlias
+              ? trimmedModelId
+              : `${providerId}-${trimmedModelId}`;
+            
             let modelName = trimmedModelId;
             
             if (trimmedModelId.startsWith(providerId + '-')) {
               modelName = trimmedModelId.substring(providerId.length + 1);
             }
-            
+
             if (modelName.includes('/')) {
               const parts = modelName.split('/');
               modelName = parts[parts.length - 1];
@@ -228,7 +235,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             }
             
             const modelOption: ModelOption = {
-              id: `${providerId}-${trimmedModelId}`,
+              id: optionId,
               name: modelName,
               provider: providerId,
               providerName: PROVIDER_LABELS[providerId] || providerId,
@@ -253,10 +260,25 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       // 加载已选择的模型
       const savedSelected = localStorage.getItem(storageKey);
       
-      if (savedSelected && modelList.find(m => m.id === savedSelected)) {
-        setSelectedModel(savedSelected);
+      const findModel = (id: string | null) => id && modelList.find(m => m.id === id);
+      const savedSelectedRaw = localStorage.getItem(storageKey);
+      
+      const normalizeDuplicatePrefix = (id: string) => {
+        // 将形如 "provider-provider-model" 规范为 "provider-model"
+        const parts = id.split('-');
+        if (parts.length > 2 && parts[0] === parts[1]) {
+          return [parts[0], ...parts.slice(2)].join('-');
+        }
+        return id;
+      };
+
+      const selected = findModel(savedSelectedRaw)
+        || (savedSelectedRaw ? findModel(normalizeDuplicatePrefix(savedSelectedRaw)) : undefined);
+
+      if (selected) {
+        setSelectedModel(selected.id);
         if (onChange) {
-          onChange(savedSelected);
+          onChange(selected.id);
         }
       } else if (modelList.length > 0 && !value) {
         // 如果没有保存的选择且没有外部传入的值，选择第一个

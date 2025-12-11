@@ -129,13 +129,14 @@ export class OpenAIAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || OPENAI_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {
       console.log('[OpenAIAdapter] 开始获取模型列表...');
       const response = await client.models.list();
       console.log(`[OpenAIAdapter] API 返回 ${response.data.length} 个模型`);
-      
+
       // 只返回真实从 API 获取的模型
       const dynamicModels = response.data
         .filter((model) => model.id.includes('gpt'))
@@ -143,7 +144,7 @@ export class OpenAIAdapter implements ITextProviderAdapter {
           // 从真实 API 返回的模型信息中判断视觉支持
           // 基于模型 ID 模式（这是从真实 API 返回的数据）
           const supportsVision = model.id.includes('vision') || model.id.includes('4');
-          
+
           return {
             id: model.id,
             name: model.id,
@@ -156,9 +157,9 @@ export class OpenAIAdapter implements ITextProviderAdapter {
             },
           };
         });
-      
+
       console.log(`[OpenAIAdapter] 从真实 API 获取 ${dynamicModels.length} 个模型`);
-      
+
       // 只返回真实获取的模型，不合并静态模型
       return dynamicModels;
     } catch (error) {
@@ -189,6 +190,7 @@ export class OpenAIAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || OPENAI_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     const response = await client.chat.completions.create({
@@ -218,10 +220,10 @@ export class OpenAIAdapter implements ITextProviderAdapter {
       content: choice.message.content || '',
       usage: response.usage
         ? {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens,
+        }
         : undefined,
     };
   }
@@ -234,6 +236,7 @@ export class OpenAIAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || OPENAI_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {

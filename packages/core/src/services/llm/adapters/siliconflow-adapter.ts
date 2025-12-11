@@ -95,13 +95,14 @@ export class SiliconflowAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || SILICONFLOW_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {
       console.log('[SiliconFlowAdapter] 开始获取模型列表...');
       const response = await client.models.list();
       console.log(`[SiliconFlowAdapter] API 返回 ${response.data.length} 个模型`);
-      
+
       // 只返回真实从 API 获取的模型
       const dynamicModels = response.data.map((model) => ({
         id: model.id,
@@ -114,9 +115,9 @@ export class SiliconflowAdapter implements ITextProviderAdapter {
           maxContextLength: 128000,
         },
       }));
-      
+
       console.log(`[SiliconFlowAdapter] 从真实 API 获取 ${dynamicModels.length} 个模型`);
-      
+
       // 只返回真实获取的模型，不合并静态模型
       return dynamicModels;
     } catch (error) {
@@ -147,6 +148,7 @@ export class SiliconflowAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || SILICONFLOW_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     const response = await client.chat.completions.create({
@@ -167,10 +169,10 @@ export class SiliconflowAdapter implements ITextProviderAdapter {
       content: choice.message.content || '',
       usage: response.usage
         ? {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens,
+        }
         : undefined,
     };
   }
@@ -183,6 +185,7 @@ export class SiliconflowAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || SILICONFLOW_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {

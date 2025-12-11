@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { PromptOptimizer } from '@text-image-prompt-tools/ui';
-import { ImageToPrompt } from '@text-image-prompt-tools/ui';
+import { PromptOptimizer, ImageToPrompt } from '@text-image-prompt-tools/ui';
+
+type TemplateOption = {
+  id: string;
+  name: string;
+  language: 'zh' | 'en';
+};
 import {
   TextAdapterRegistry,
   LLMService,
@@ -19,6 +24,7 @@ import {
   HistoryManager,
   type TextModelConfig,
   type TextProvider,
+  type Template,
 } from '@text-image-prompt-tools/core';
 import {
   setPromptService,
@@ -37,6 +43,9 @@ function App() {
   const [modelConfigs, setModelConfigs] = useState<TextModelConfig[]>([]);
   const [providers, setProviders] = useState<TextProvider[]>([]);
   const [registry, setRegistry] = useState<TextAdapterRegistry | null>(null);
+  const [templateManager, setTemplateManager] = useState<MemoryTemplateManager | null>(null);
+  const [optimizeTemplates, setOptimizeTemplates] = useState<TemplateOption[]>([]);
+  const [image2promptTemplates, setImage2promptTemplates] = useState<TemplateOption[]>([]);
 
   useEffect(() => {
     // 初始化服务（使用内部 async 函数）
@@ -82,18 +91,40 @@ function App() {
       const historyMgr = new HistoryManager();
       setHistoryManager(historyMgr);
       
-      const templateManager = new MemoryTemplateManager();
+      const templateMgr = new MemoryTemplateManager();
+      setTemplateManager(templateMgr);
+      
+      // 获取所有模板并分类
+      const allTemplates = await templateMgr.getAllTemplates();
+      const optimizeTemplatesList = allTemplates
+        .filter(t => t.metadata.templateType === 'optimize' || t.metadata.templateType === 'text2imageOptimize')
+        .map(t => ({
+          id: t.id,
+          name: t.name,
+          language: t.metadata.language,
+        }));
+      const image2promptTemplatesList = allTemplates
+        .filter(t => t.metadata.templateType === 'image2prompt')
+        .map(t => ({
+          id: t.id,
+          name: t.name,
+          language: t.metadata.language,
+        }));
+      
+      setOptimizeTemplates(optimizeTemplatesList);
+      setImage2promptTemplates(image2promptTemplatesList);
+      
       const llmService = new LLMService(reg, manager);
 
       const promptService = new PromptService(
         llmService,
         manager,
-        templateManager
+        templateMgr
       );
       const imageService = new ImageService(
         llmService,
         manager,
-        templateManager
+        templateMgr
       );
 
       // 设置服务到 hooks
@@ -339,6 +370,9 @@ function App() {
           <div className="absolute inset-0 w-full h-full">
             <PromptOptimizer
               availableModels={getAvailableModels() as any}
+              availableTemplates={optimizeTemplates as any}
+              defaultTemplateId={undefined}
+              templateManager={templateManager}
               onOptimized={() => {}}
             />
           </div>
@@ -347,6 +381,9 @@ function App() {
           <div className="absolute inset-0 w-full h-full">
             <ImageToPrompt
               availableModels={getVisionModels() as any}
+              availableTemplates={image2promptTemplates as any}
+              defaultTemplateId={undefined}
+              templateManager={templateManager}
               onExtracted={() => {}}
             />
           </div>

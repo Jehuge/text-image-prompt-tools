@@ -84,13 +84,14 @@ export class DeepSeekAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || DEEPSEEK_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {
       console.log('[DeepSeekAdapter] 开始获取模型列表...');
       const response = await client.models.list();
       console.log(`[DeepSeekAdapter] API 返回 ${response.data.length} 个模型`);
-      
+
       // 只返回真实从 API 获取的模型
       const dynamicModels = response.data
         .filter((model) => model.id.includes('deepseek'))
@@ -109,9 +110,9 @@ export class DeepSeekAdapter implements ITextProviderAdapter {
             },
           };
         });
-      
+
       console.log(`[DeepSeekAdapter] 从真实 API 获取 ${dynamicModels.length} 个模型`);
-      
+
       // 只返回真实获取的模型，不合并静态模型
       return dynamicModels;
     } catch (error) {
@@ -142,6 +143,7 @@ export class DeepSeekAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || DEEPSEEK_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     const response = await client.chat.completions.create({
@@ -162,10 +164,10 @@ export class DeepSeekAdapter implements ITextProviderAdapter {
       content: choice.message.content || '',
       usage: response.usage
         ? {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens,
+        }
         : undefined,
     };
   }
@@ -178,6 +180,7 @@ export class DeepSeekAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: config.connectionConfig.apiKey,
       baseURL: config.connectionConfig.baseURL || DEEPSEEK_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {

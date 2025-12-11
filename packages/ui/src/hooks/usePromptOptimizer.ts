@@ -24,11 +24,14 @@ export function usePromptOptimizer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
+  const [streamingResult, setStreamingResult] = useState<string>('');
 
   const optimize = async (
     prompt: string,
     modelKey: string,
-    style: PromptStyle = 'general'
+    style: PromptStyle = 'general',
+    templateId?: string
   ): Promise<string | null> => {
     if (!promptServiceInstance) {
       setError(new Error('提示词服务未初始化'));
@@ -44,6 +47,7 @@ export function usePromptOptimizer() {
         targetPrompt: prompt,
         modelKey,
         style,
+        templateId,
       };
       const response = await promptServiceInstance.optimizePrompt(request);
       setResult(response.optimizedPrompt);
@@ -72,11 +76,82 @@ export function usePromptOptimizer() {
     }
   };
 
+  const optimizeStream = async (
+    prompt: string,
+    modelKey: string,
+    style: PromptStyle = 'general',
+    templateId?: string
+  ): Promise<string | null> => {
+    if (!promptServiceInstance) {
+      setError(new Error('提示词服务未初始化'));
+      return null;
+    }
+
+    setStreaming(true);
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setStreamingResult('');
+
+    try {
+      const request: OptimizationRequest = {
+        targetPrompt: prompt,
+        modelKey,
+        style,
+        templateId,
+      };
+
+      await promptServiceInstance.optimizePromptStream(request, {
+        onChunk: (chunk) => {
+          setStreamingResult((prev) => prev + chunk);
+        },
+        onComplete: (content) => {
+          setStreamingResult(content);
+          setResult(content);
+          setStreaming(false);
+          setLoading(false);
+          // 保存历史记录
+          if (historyManagerInstance) {
+            const record: PromptOptimizeRecord = {
+              id: `prompt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              type: 'prompt-optimize',
+              originalPrompt: prompt,
+              optimizedPrompt: content,
+              modelKey,
+              style,
+              timestamp: Date.now(),
+            };
+            void historyManagerInstance.addRecord(record);
+          }
+        },
+        onError: (err) => {
+          const error = err instanceof Error ? err : new Error(String(err));
+          setError(error);
+          setStreaming(false);
+          setLoading(false);
+        },
+      });
+
+      return null;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      return null;
+    } finally {
+      // loading/streaming already handled in callbacks; ensure no leak if early throw
+      setStreaming(false);
+      setLoading(false);
+    }
+  };
+
   return {
     optimize,
+    optimizeStream,
     loading,
     error,
     result,
+    streaming,
+    streamingResult,
   };
 }
 

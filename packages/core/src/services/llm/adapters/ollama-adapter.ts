@@ -125,11 +125,11 @@ export class OllamaAdapter implements ITextProviderAdapter {
 
   async getModelsAsync(config: TextModelConfig): Promise<TextModel[]> {
     const baseURL = config.connectionConfig.baseURL || OLLAMA_PROVIDER.defaultBaseURL;
-    
+
     // Ollama 使用 OpenAI 兼容的 API，但模型列表需要通过 /api/tags 获取
     const tagsUrl = baseURL.replace('/v1', '') + '/api/tags';
     console.log('[OllamaAdapter] 获取模型列表:', tagsUrl);
-    
+
     const response = await fetch(tagsUrl, {
       method: 'GET',
       headers: {
@@ -143,7 +143,7 @@ export class OllamaAdapter implements ITextProviderAdapter {
     }
 
     const data = await response.json();
-    
+
     if (!data.models || !Array.isArray(data.models)) {
       throw new Error('API 返回格式异常：models 字段不存在或不是数组');
     }
@@ -154,12 +154,12 @@ export class OllamaAdapter implements ITextProviderAdapter {
       const modelId = model.name || '';
       // 从真实获取的模型信息中判断是否支持视觉
       // 基于模型名称模式（这是从真实 API 返回的数据中获取的信息）
-      const supportsVision = 
-        modelId.includes('vision') || 
-        modelId.includes('llava') || 
+      const supportsVision =
+        modelId.includes('vision') ||
+        modelId.includes('llava') ||
         modelId.includes('qwen2.5-vision') ||
         modelId.includes('llama3.2-vision');
-      
+
       return {
         id: modelId,
         name: modelId,
@@ -174,19 +174,19 @@ export class OllamaAdapter implements ITextProviderAdapter {
     });
 
     console.log(`[OllamaAdapter] 成功获取 ${dynamicModels.length} 个真实模型`);
-    
+
     // 只返回真实获取的模型，不合并静态模型
     return dynamicModels;
   }
 
   buildDefaultModel(modelId: string): TextModel {
     // 判断是否支持视觉
-    const supportsVision = 
-      modelId.includes('vision') || 
-      modelId.includes('llava') || 
+    const supportsVision =
+      modelId.includes('vision') ||
+      modelId.includes('llava') ||
       modelId.includes('qwen2.5-vision') ||
       modelId.includes('llama3.2-vision');
-    
+
     return {
       id: modelId,
       name: modelId,
@@ -207,6 +207,7 @@ export class OllamaAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: 'ollama', // Ollama 不需要真实的 API Key，但 OpenAI SDK 需要
       baseURL: config.connectionConfig.baseURL || OLLAMA_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {
@@ -231,10 +232,10 @@ export class OllamaAdapter implements ITextProviderAdapter {
         content: response.choices[0]?.message?.content || '',
         usage: response.usage
           ? {
-              promptTokens: response.usage.prompt_tokens,
-              completionTokens: response.usage.completion_tokens,
-              totalTokens: response.usage.total_tokens,
-            }
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: response.usage.completion_tokens,
+            totalTokens: response.usage.total_tokens,
+          }
           : undefined,
       };
     } catch (error: any) {
@@ -251,6 +252,7 @@ export class OllamaAdapter implements ITextProviderAdapter {
     const client = new OpenAI({
       apiKey: 'ollama', // Ollama 不需要真实的 API Key，但 OpenAI SDK 需要
       baseURL: config.connectionConfig.baseURL || OLLAMA_PROVIDER.defaultBaseURL,
+      dangerouslyAllowBrowser: true,
     });
 
     try {

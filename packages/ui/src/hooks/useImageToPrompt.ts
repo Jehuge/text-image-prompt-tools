@@ -25,7 +25,8 @@ export function useImageToPrompt() {
 
   const extract = async (
     imageUrl: string,
-    modelKey: string
+    modelKey: string,
+    templateId?: string
   ): Promise<string | null> => {
     if (!imageServiceInstance) {
       setError(new Error('图片服务未初始化'));
@@ -40,6 +41,7 @@ export function useImageToPrompt() {
       const request: ImageToPromptRequest = {
         imageUrl,
         modelKey,
+        templateId,
       };
       const response = await imageServiceInstance.imageToPrompt(request);
       setResult(response.prompt);
