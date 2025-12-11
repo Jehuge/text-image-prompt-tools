@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Brain, ChevronDown, CheckCircle2, Image as ImageIcon } from 'lucide-react'
+import { Brain, ChevronDown, CheckCircle2, Image as ImageIcon, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { TextAdapterRegistry } from '@text-image-prompt-tools/core'
 
@@ -237,6 +237,10 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
                     <div className="text-sm font-medium text-gray-900 truncate">
                       {currentModel.name}
                     </div>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-xs shrink-0 border border-gray-200">
+                      <FileText className="w-3 h-3" />
+                      text
+                    </span>
                     {currentModel.supportsVision && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs shrink-0 border border-blue-200">
                         <ImageIcon className="w-3 h-3" />
@@ -294,6 +298,10 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <div className="text-sm font-medium truncate">{model.name}</div>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-xs shrink-0 border border-gray-200">
+                              <FileText className="w-3 h-3" />
+                              text
+                            </span>
                             {model.supportsVision && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs shrink-0 border border-blue-200">
                                 <ImageIcon className="w-3 h-3" />
