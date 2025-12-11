@@ -1,0 +1,38 @@
+{
+  "name": "text-image-prompt-tools",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.6.1",
+  "engines": {
+    "node": "^18.0.0 || ^20.0.0 || ^22.0.0",
+    "npm": "请使用pnpm代替npm",
+    "yarn": "请使用pnpm代替yarn"
+  },
+  "scripts": {
+    "build": "npm-run-all build:core build:ui build:web",
+    "build:core": "pnpm -F @text-image-prompt-tools/core build",
+    "build:ui": "pnpm -F @text-image-prompt-tools/ui build",
+    "build:web": "pnpm -F @text-image-prompt-tools/web build",
+    "dev": "npm-run-all clean:dist build:core build:ui dev:parallel",
+    "dev:parallel": "concurrently -k -p \"[{name}]\" -n \"UI,WEB\" \"pnpm -F @text-image-prompt-tools/ui build --watch\" \"pnpm -F @text-image-prompt-tools/web dev\"",
+    "clean": "npm-run-all clean:dist",
+    "clean:dist": "rimraf packages/core/dist packages/ui/dist packages/web/dist",
+    "pnpm-install": "pnpm install"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.22",
+    "concurrently": "^8.2.2",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^8.5.6",
+    "rimraf": "^4.4.1",
+    "tailwindcss": "3.4.17",
+    "typescript": "^5.8.2"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "lucide-react": "^0.559.0",
+    "react-hot-toast": "^2.6.0"
+  }
+}
