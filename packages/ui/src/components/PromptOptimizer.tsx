@@ -86,7 +86,7 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
                 onClick={() => setStyle(option.value)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
                   style === option.value 
-                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm' 
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-sm' 
                   : 'bg-gray-100 text-gray-600 border-gray-300 hover:border-gray-400 hover:text-gray-900'
                 }`}
               >
@@ -107,7 +107,7 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
           <button
             onClick={handleOptimize}
             disabled={loading || !prompt.trim() || !model}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 flex justify-center items-center gap-2 shadow-sm"
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 flex justify-center items-center gap-2 shadow-sm"
           >
             {loading ? (
               <>
@@ -158,7 +158,7 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
           ) : (
             <div className="whitespace-pre-wrap font-mono text-sm text-gray-800 leading-relaxed">
               {result}
-              {loading && <span className="inline-block w-2 h-4 ml-1 bg-indigo-500 animate-pulse"/>}
+              {loading && <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse"/>}
             </div>
           )}
         </div>

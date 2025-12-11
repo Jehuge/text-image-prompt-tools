@@ -308,7 +308,7 @@ function App() {
         {/* Brand and Nav */}
         <div className="flex items-center gap-2 md:gap-8 flex-1">
            <div className="flex items-center gap-3 mr-4">
-              <div className="bg-indigo-600 p-1.5 rounded-lg flex-shrink-0">
+              <div className="bg-blue-600 p-1.5 rounded-lg flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path><path d="M8.5 8.5v.01"></path><path d="M11.5 15.5v.01"></path><path d="M15.5 11.5v.01"></path></svg>
               </div>
               <span className="font-bold text-lg tracking-tight hidden md:block text-gray-900">提示词优化&图片反推</span>
@@ -321,7 +321,7 @@ function App() {
                   onClick={() => setActiveTab(item.id as any)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                     activeTab === item.id 
-                    ? 'bg-indigo-600 text-white shadow-sm' 
+                    ? 'bg-blue-600 text-white shadow-sm' 
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >

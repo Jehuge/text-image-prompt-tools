@@ -84,7 +84,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value as HistoryRecordType | 'all')}
-              className="px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none"
+              className="px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
             >
               <option value="all">全部</option>
               <option value="prompt-optimize">提示词优化</option>
@@ -125,7 +125,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
                         record.type === 'prompt-optimize' 
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                        ? 'bg-blue-50 text-blue-700 border-blue-200' 
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       }`}
                     >

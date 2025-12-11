@@ -24,10 +24,10 @@ interface ModelItem {
 const PROVIDER_COLORS: Record<string, string> = {
   openai: 'bg-green-50',
   deepseek: 'bg-blue-50',
-  siliconflow: 'bg-purple-50',
+  siliconflow: 'bg-blue-50',
   anthropic: 'bg-orange-50',
   gemini: 'bg-yellow-50',
-  zhipu: 'bg-indigo-50',
+  zhipu: 'bg-blue-50',
   ollama: 'bg-teal-50',
 }
 
@@ -431,7 +431,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                   onClick={() => setSelectedProvider(provider.id)}
                   className={`flex flex-col items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all relative ${
                     selectedProvider === provider.id
-                      ? 'border-indigo-500 bg-indigo-50'
+                      ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -447,7 +447,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                     )}
                   </div>
                   {selectedProvider === provider.id && (
-                    <CheckCircle2 className="w-5 h-5 text-indigo-600" />
+                    <CheckCircle2 className="w-5 h-5 text-blue-600" />
                   )}
                   {hasModel && (
                     <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full"></div>
@@ -492,7 +492,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                   value={currentConfig.apiKey || ''}
                   onChange={(e) => handleConfigChange('apiKey', e.target.value)}
                   placeholder={currentProvider?.requiresApiKey ? `请输入 ${currentProvider?.name || '提供商'} API Key` : 'API Key（可选）'}
-                  className="w-full px-4 py-2.5 bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pr-10 placeholder-gray-400"
+                  className="w-full px-4 py-2.5 bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 placeholder-gray-400"
                 />
                 {currentProvider?.requiresApiKey && (
                   <button
@@ -526,7 +526,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                 value={currentConfig.baseUrl || ''}
                 onChange={(e) => handleConfigChange('baseUrl', e.target.value)}
                 placeholder={currentProvider?.defaultBaseURL || ''}
-                className="w-full px-4 py-2.5 bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400"
+                className="w-full px-4 py-2.5 bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
               />
               <p className="text-xs text-gray-500 mt-1">
                 默认值已自动填充，通常无需修改
@@ -548,7 +548,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                 <button
                   onClick={loadModels}
                   disabled={loadingModels || (currentProvider?.requiresApiKey && !currentConfig.apiKey?.trim())}
-                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-indigo-50 transition-colors"
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-blue-50 transition-colors"
                   title={currentProvider?.requiresApiKey && !currentConfig.apiKey?.trim() ? '请先输入 API Key' : '刷新模型列表'}
                 >
                   <RefreshCw className={`w-3 h-3 ${loadingModels ? 'animate-spin' : ''}`} />
@@ -558,7 +558,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
               
               {loadingModels ? (
                 <div className="flex items-center justify-center py-4 border border-gray-300 rounded-lg bg-gray-50">
-                  <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                   <span className="ml-2 text-sm text-gray-600">正在加载模型列表...</span>
                 </div>
               ) : availableModels.length > 0 ? (
@@ -571,7 +571,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                           key={model.id}
                           className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
                             isSelected
-                              ? 'bg-indigo-50 border border-indigo-200'
+                              ? 'bg-blue-50 border border-blue-200'
                               : 'hover:bg-gray-100 border border-transparent'
                           }`}
                           onClick={(e) => {
@@ -588,13 +588,13 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                               handleModelToggle(model.id)
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <div className="text-sm font-medium text-gray-900">{model.name}</div>
                               {model.supportsVision && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs border border-purple-200">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs border border-blue-200">
                                   <ImageIcon className="w-3 h-3" />
                                   视觉
                                 </span>
@@ -603,7 +603,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                             <div className="text-xs text-gray-500">{model.provider}</div>
                           </div>
                           {isSelected && (
-                            <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
                           )}
                         </label>
                       )
@@ -637,7 +637,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
               <button
                 onClick={handleSave}
                 disabled={saving || !currentConfig.models || currentConfig.models.length === 0}
-                className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" />
                 {saving ? '保存中...' : '保存配置'}

@@ -38,10 +38,10 @@ const PROVIDER_LABELS: Record<string, string> = {
 const PROVIDER_COLORS: Record<string, string> = {
   openai: 'bg-green-50 text-green-700 border-green-200',
   deepseek: 'bg-blue-50 text-blue-700 border-blue-200',
-  siliconflow: 'bg-purple-50 text-purple-700 border-purple-200',
+  siliconflow: 'bg-blue-50 text-blue-700 border-blue-200',
   anthropic: 'bg-orange-50 text-orange-700 border-orange-200',
   gemini: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  zhipu: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  zhipu: 'bg-blue-50 text-blue-700 border-blue-200',
   ollama: 'bg-teal-50 text-teal-700 border-teal-200',
 }
 
@@ -226,10 +226,10 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50/50 transition-all text-left"
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50/50 transition-all text-left"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <Brain className="w-5 h-5 text-indigo-600 shrink-0" />
+            <Brain className="w-5 h-5 text-blue-600 shrink-0" />
             <div className="flex-1 min-w-0">
               {currentModel ? (
                 <>
@@ -238,7 +238,7 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
                       {currentModel.name}
                     </div>
                     {currentModel.supportsVision && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs shrink-0 border border-purple-200">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs shrink-0 border border-blue-200">
                         <ImageIcon className="w-3 h-3" />
                         视觉
                       </span>
@@ -285,7 +285,7 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
                       onClick={() => handleModelChange(model.id)}
                       className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
                         selectedModel === model.id
-                          ? 'bg-indigo-50 text-indigo-700 font-medium'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
                           : 'text-gray-700'
                       }`}
                     >
@@ -295,7 +295,7 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
                           <div className="flex items-center gap-2">
                             <div className="text-sm font-medium truncate">{model.name}</div>
                             {model.supportsVision && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs shrink-0 border border-purple-200">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs shrink-0 border border-blue-200">
                                 <ImageIcon className="w-3 h-3" />
                                 视觉
                               </span>
@@ -310,7 +310,7 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
                             {model.providerName}
                           </span>
                           {selectedModel === model.id && (
-                            <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                            <CheckCircle2 className="w-4 h-4 text-blue-600" />
                           )}
                         </div>
                       </div>
