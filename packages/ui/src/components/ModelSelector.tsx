@@ -48,14 +48,15 @@ const PROVIDER_COLORS: Record<string, string> = {
 };
 
 // 提供商图标文件映射
+// 使用相对路径以支持 Electron 的 file:// 协议
 const PROVIDER_ICON_MAP: Record<string, string> = {
-  openai: '/icons/openai-svgrepo-com.svg',
-  anthropic: '/icons/claude-color.svg',
-  gemini: '/icons/gemini-color.svg',
-  deepseek: '/icons/deepseek-color.svg',
-  siliconflow: '/icons/siliconcloud-color.svg',
-  zhipu: '/icons/chatglm-color.svg',
-  ollama: '/icons/ollama.svg',
+  openai: './icons/openai-svgrepo-com.svg',
+  anthropic: './icons/claude-color.svg',
+  gemini: './icons/gemini-color.svg',
+  deepseek: './icons/deepseek-color.svg',
+  siliconflow: './icons/siliconcloud-color.svg',
+  zhipu: './icons/chatglm-color.svg',
+  ollama: './icons/ollama.svg',
 };
 
 // 提供商图标组件

@@ -11,6 +11,9 @@
     "build:watch": "vite build --watch",
     "build:electron": "pnpm build && electron-builder",
     "build:pkg": "pnpm build && electron-builder --mac",
+    "build:pkg:x64": "pnpm build && electron-builder --mac --x64",
+    "build:pkg:arm64": "pnpm build && electron-builder --mac --arm64",
+    "clean:release": "rm -rf release",
     "prebuild:electron": "pnpm build"
   },
   "build": {
@@ -18,6 +21,7 @@
     "productName": "提示词优化工具",
     "mac": {
       "category": "public.app-category.utilities",
+      "icon": "build/icon.icns",
       "target": [
         {
           "target": "pkg",

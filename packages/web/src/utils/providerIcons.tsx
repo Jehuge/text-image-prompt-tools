@@ -15,10 +15,12 @@ const PROVIDER_ICON_MAP: Record<string, string> = {
 
 /**
  * 获取提供商的图标路径
+ * 使用相对路径以支持 Electron 的 file:// 协议
  */
 export const getProviderIconPath = (providerId: string): string => {
   const iconFile = PROVIDER_ICON_MAP[providerId] || 'openai-svgrepo-com.svg';
-  return `/icons/${iconFile}`;
+  // 在 Electron 中需要使用相对路径，在 Web 中也可以正常工作
+  return `./icons/${iconFile}`;
 };
 
 /**

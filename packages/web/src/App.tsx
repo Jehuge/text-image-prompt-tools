@@ -338,7 +338,7 @@ function App() {
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 overflow-hidden font-sans">
       <Toaster position="top-right" />
       {/* Top Header Navigation */}
-      <header className="h-16 flex-shrink-0 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-4 md:px-6 relative z-10">
+      <header className="h-16 flex-shrink-0 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-4 md:px-6 relative z-10 drag-region">
 
         {/* Brand and Nav */}
         <div className="flex items-center gap-2 md:gap-8 flex-1">
@@ -349,12 +349,12 @@ function App() {
             <span className="font-bold text-lg tracking-tight hidden md:block text-gray-900">提示词优化&图片反推</span>
           </div>
 
-          <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar mask-gradient">
+          <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar mask-gradient no-drag">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as any)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === item.id
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap no-drag ${activeTab === item.id
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
