@@ -4,6 +4,8 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  // 使用相对路径，确保在 Electron 的 file:// 协议下资源能正确加载
+  base: './',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

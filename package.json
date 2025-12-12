@@ -13,10 +13,13 @@
     "build:core": "pnpm -F @text-image-prompt-tools/core build",
     "build:ui": "pnpm -F @text-image-prompt-tools/ui build",
     "build:web": "pnpm -F @text-image-prompt-tools/web build",
+    "build:desktop": "pnpm -F @text-image-prompt-tools/desktop build:electron",
+    "build:pkg": "pnpm -F @text-image-prompt-tools/desktop build:pkg",
     "dev": "npm-run-all clean:dist build:core build:ui dev:parallel",
     "dev:parallel": "concurrently -k -p \"[{name}]\" -n \"UI,WEB\" \"pnpm -F @text-image-prompt-tools/ui build --watch\" \"pnpm -F @text-image-prompt-tools/web dev\"",
+    "dev:desktop": "pnpm -F @text-image-prompt-tools/desktop dev",
     "clean": "npm-run-all clean:dist",
-    "clean:dist": "rimraf packages/core/dist packages/ui/dist packages/web/dist",
+    "clean:dist": "rimraf packages/core/dist packages/ui/dist packages/web/dist packages/desktop/dist packages/desktop/release",
     "pnpm-install": "pnpm install"
   },
   "devDependencies": {

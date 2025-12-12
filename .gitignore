@@ -6,12 +6,30 @@ node_modules/
 # Testing
 coverage/
 
-# Production
+# Production - Build outputs
 dist/
 build/
+*.tsbuildinfo
 
-# Misc
-.DS_Store
+# Electron Desktop App
+packages/desktop/dist/
+packages/desktop/release/
+packages/desktop/*.app
+packages/desktop/*.pkg
+packages/desktop/*.dmg
+packages/desktop/*.zip
+packages/desktop/*.deb
+packages/desktop/*.rpm
+packages/desktop/*.AppImage
+packages/desktop/*.exe
+packages/desktop/*.msi
+
+# Electron Builder
+packages/desktop/builder-debug.yml
+packages/desktop/builder-effective-config.yaml
+packages/desktop/*.plist
+
+# Environment variables
 .env
 .env.local
 .env.development.local
@@ -25,13 +43,26 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Editor
+# Editor directories and files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
 

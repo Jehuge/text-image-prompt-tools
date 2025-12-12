@@ -31,32 +31,82 @@ pnpm build:web
 
 ## 桌面应用打包 (Electron)
 
+### 前置要求
+
+- macOS 系统（用于打包 macOS pkg）
+- 已安装所有依赖 (`pnpm install`)
+
 ### 安装 Electron 依赖
+
+在项目根目录执行：
 ```bash
-cd packages/desktop
 pnpm install
 ```
 
+这会自动安装 desktop 包的依赖。
+
 ### 开发模式
+
 ```bash
+# 从项目根目录
 pnpm dev:desktop
 ```
 
-### 打包
+这会启动开发服务器并打开 Electron 窗口。
+
+### 构建 macOS PKG 安装包
+
+#### 方式一：使用根目录脚本（推荐）
+
 ```bash
-pnpm build:desktop
+# 从项目根目录执行
+pnpm build:pkg
 ```
 
-### 平台特定打包
+这会：
+1. 构建所有依赖（core、ui、web）
+2. 构建 Electron 应用
+3. 生成 macOS pkg 安装包
+
+生成的 pkg 文件位于：`packages/desktop/release/`
+
+#### 方式二：在 desktop 目录执行
+
 ```bash
-# Mac
-pnpm build:desktop --mac
+cd packages/desktop
+pnpm build:pkg
+```
+
+### 图标配置
+
+在打包前，建议准备应用图标：
+
+1. 准备一个 1024x1024 的 PNG 图标文件
+2. 转换为 `.icns` 格式（参考 `packages/desktop/build/README.md`）
+3. 将 `icon.icns` 放在 `packages/desktop/build/` 目录下
+
+如果没有图标，electron-builder 会使用默认图标。
+
+### 打包配置说明
+
+打包配置在 `packages/desktop/package.json` 的 `build` 字段中：
+
+- **appId**: 应用唯一标识符
+- **productName**: 应用显示名称
+- **mac.target**: 目标格式（pkg）
+- **pkg.installLocation**: 安装位置（/Applications）
+
+### 其他平台打包
+
+```bash
+# macOS DMG
+pnpm -F @text-image-prompt-tools/desktop build:electron --mac
 
 # Windows
-pnpm build:desktop --win
+pnpm -F @text-image-prompt-tools/desktop build:electron --win
 
 # Linux
-pnpm build:desktop --linux
+pnpm -F @text-image-prompt-tools/desktop build:electron --linux
 ```
 
 ## 浏览器插件打包

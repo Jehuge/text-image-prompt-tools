@@ -1,0 +1,55 @@
+{
+  "name": "@text-image-prompt-tools/desktop",
+  "version": "1.0.0",
+  "description": "提示词优化&图片反推 - 桌面版",
+  "main": "dist/main.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"BUILD,ELECTRON\" \"pnpm build:watch\" \"wait-on http://localhost:3000 && electron .\"",
+    "build": "node build.js",
+    "build:watch": "vite build --watch",
+    "build:electron": "pnpm build && electron-builder",
+    "build:pkg": "pnpm build && electron-builder --mac",
+    "prebuild:electron": "pnpm build"
+  },
+  "build": {
+    "appId": "com.textimageprompttools.app",
+    "productName": "提示词优化工具",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "pkg",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "files": [
+      "dist/main.js",
+      "dist/preload.js",
+      "dist/renderer/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "dist/main.js"
+    },
+    "directories": {
+      "output": "release"
+    },
+    "pkg": {
+      "installLocation": "/Applications"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^8.2.2",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.8.2",
+    "vite": "^6.0.0",
+    "wait-on": "^8.0.1"
+  }
+}
+
