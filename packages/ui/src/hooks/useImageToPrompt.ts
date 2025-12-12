@@ -18,17 +18,24 @@ export function setHistoryManager(manager: HistoryManager) {
   historyManagerInstance = manager;
 }
 
-export function useImageToPrompt() {
+export function useImageToPrompt(
+  injectedService?: ImageService,
+  injectedHistory?: HistoryManager
+) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [result, setResult] = useState<string | null>(null);
+
+  const getImageService = () => injectedService || imageServiceInstance;
+  const getHistoryManager = () => injectedHistory || historyManagerInstance;
 
   const extract = async (
     imageUrl: string,
     modelKey: string,
     templateId?: string
   ): Promise<string | null> => {
-    if (!imageServiceInstance) {
+    const service = getImageService();
+    if (!service) {
       setError(new Error('图片服务未初始化'));
       return null;
     }
@@ -43,11 +50,12 @@ export function useImageToPrompt() {
         modelKey,
         templateId,
       };
-      const response = await imageServiceInstance.imageToPrompt(request);
+      const response = await service.imageToPrompt(request);
       setResult(response.prompt);
-      
+
       // 保存历史记录
-      if (historyManagerInstance) {
+      const historyMgr = getHistoryManager();
+      if (historyMgr) {
         const record: ImageToPromptRecord = {
           id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'image-to-prompt',
@@ -56,9 +64,9 @@ export function useImageToPrompt() {
           modelKey,
           timestamp: Date.now(),
         };
-        await historyManagerInstance.addRecord(record);
+        await historyMgr.addRecord(record);
       }
-      
+
       return response.prompt;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

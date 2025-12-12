@@ -10,6 +10,8 @@ export interface TemplateOption {
   language: 'zh' | 'en';
 }
 
+import type { PromptService, HistoryManager } from '@text-image-prompt-tools/core';
+
 export interface PromptOptimizerProps {
   defaultModel?: string;
   defaultStyle?: PromptStyle;
@@ -18,6 +20,8 @@ export interface PromptOptimizerProps {
   availableModels?: Array<{ id: string; name: string }>;
   availableTemplates?: TemplateOption[];
   templateManager?: any; // ITemplateManager 类型，但为了避免循环依赖使用 any
+  promptService?: PromptService;
+  historyManager?: HistoryManager;
 }
 
 const STYLE_OPTIONS: Array<{ value: PromptStyle; label: string }> = [
@@ -28,10 +32,6 @@ const STYLE_OPTIONS: Array<{ value: PromptStyle; label: string }> = [
   { value: 'chinese-aesthetics', label: '中国美学' },
 ];
 
-// 格式化模型名称显示
-// 注意：App.tsx 已经通过 formatModelDisplayName 格式化好了名称并传递到 name 字段
-// 这里直接使用传入的名称即可，不需要再次处理
-
 export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
   defaultModel = '',
   defaultStyle = 'general',
@@ -40,14 +40,17 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
   availableModels = [],
   availableTemplates = [],
   templateManager,
+  promptService,
+  historyManager,
 }) => {
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState(defaultModel);
   const [templateId, setTemplateId] = useState<string | undefined>(defaultTemplateId);
-  const { optimize, optimizeStream, loading, streaming, error, result, streamingResult } = usePromptOptimizer();
+  const { optimize, optimizeStream, loading, streaming, error, result, streamingResult } = usePromptOptimizer(promptService, historyManager);
   const [showThinking, setShowThinking] = useState(true);
   const promptStorageKey = 'prompt-optimizer-draft';
   const resultStorageKey = 'prompt-optimizer-result';
+  const templateStorageKey = 'prompt-optimizer-template';
   const [persistedResult, setPersistedResult] = useState<string>('');
 
   // 过滤中文模板
@@ -59,6 +62,33 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
       setShowThinking(false);
     }
   }, [streaming, streamingResult]);
+
+  // 加载模板选择
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(templateStorageKey);
+      if (saved) {
+        // 验证保存的模板ID是否仍在可用列表中 (可选，防止过期ID)
+        // 但考虑到模板列表可能异步加载，暂时直接设置，如果 TemplateSelector 处理了无效ID则没问题
+        setTemplateId(saved);
+      }
+    } catch (e) {
+      console.warn('加载模板选择失败', e);
+    }
+  }, []);
+
+  // 保存模板选择
+  useEffect(() => {
+    try {
+      if (templateId) {
+        localStorage.setItem(templateStorageKey, templateId);
+      } else {
+        localStorage.removeItem(templateStorageKey);
+      }
+    } catch (e) {
+      console.warn('保存模板选择失败', e);
+    }
+  }, [templateId]);
 
   // 加载草稿
   useEffect(() => {
@@ -127,7 +157,36 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
     }
   };
 
-  const displayText = streamingResult || result || persistedResult;
+  // 解析思考过程和最终结果
+  const parseContent = (text: string) => {
+    // 匹配 <think>...</think>
+    const thinkMatch = text.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
+
+    if (thinkMatch) {
+      const thinkingContent = thinkMatch[1];
+      const finalContent = text.replace(/<think>[\s\S]*?(?:<\/think>|$)/, '').trim();
+      return { thinking: thinkingContent, final: finalContent };
+    }
+
+    return { thinking: '', final: text };
+  };
+
+  const displayText = streamingResult || result || persistedResult || '';
+  const { thinking: thinkingContent, final: finalContent } = parseContent(displayText);
+
+  // 如果正在流式传输且检测到思考标签，或者已经有思考内容，则显示思考框
+  const hasThinking = Boolean(thinkingContent || (streaming && displayText.includes('<think>')));
+
+  // 流完成后自动收起，但保留展开入口
+  useEffect(() => {
+    if (!streaming && finalContent) {
+      setShowThinking(false);
+    }
+    // 如果有思考内容且正在流式传输，保持展开
+    if (streaming && hasThinking) {
+      setShowThinking(true);
+    }
+  }, [streaming, finalContent, hasThinking]);
 
   return (
     <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-6 p-6 overflow-hidden">
@@ -140,7 +199,7 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
           </h3>
           <span className="text-xs text-gray-500 font-mono">{prompt.length} 字符</span>
         </div>
-        
+
         {/* Model Selection */}
         <div className="p-4 border-b border-gray-200 bg-white">
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">选择模型</label>
@@ -165,7 +224,7 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
             />
           </div>
         )}
-        
+
         <textarea
           className="flex-1 w-full bg-white p-4 resize-none focus:outline-none text-gray-900 placeholder-gray-400 text-sm leading-relaxed"
           placeholder="描述你想生成的内容（例如：'一只赛博朋克风格的猫在雨中'）..."
@@ -206,8 +265,8 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
             优化结果
           </h3>
-          {displayText && (
-            <button 
+          {finalContent && (
+            <button
               onClick={copyToClipboard}
               className="text-gray-500 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded transition-all flex items-center gap-1 text-xs font-medium"
               title="复制到剪贴板"
@@ -224,39 +283,42 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
             </div>
           ) : null}
 
-          {(streaming || streamingResult) && (
+          {hasThinking && (
             <div className="border border-indigo-100 rounded-lg bg-indigo-50/60">
               <div className="flex items-center justify-between px-3 py-2 border-b border-indigo-100">
                 <div className="flex items-center gap-2 text-indigo-700 text-xs font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                  思考过程（流式输出）
+                  <span className={`w-2 h-2 rounded-full bg-indigo-500 ${streaming ? 'animate-pulse' : ''}`} />
+                  思考过程
+                  {streaming && <span className="text-indigo-400 font-normal ml-1">(生成中...)</span>}
                 </div>
                 <button
                   className="text-xs text-indigo-600 hover:text-indigo-800"
                   onClick={() => setShowThinking((v) => !v)}
                 >
-                  {showThinking || streaming ? '隐藏' : '展开'}
+                  {showThinking ? '隐藏' : '展开'}
                 </button>
               </div>
-              {(showThinking || streaming) && (
-                <div className="px-3 py-3 text-sm whitespace-pre-wrap font-mono text-gray-800 leading-relaxed">
-                  {streamingResult || '...'}
-                  {streaming && <span className="inline-block w-2 h-4 ml-1 bg-indigo-500 animate-pulse" />}
+              {showThinking && (
+                <div className="px-3 py-3 text-sm whitespace-pre-wrap font-mono text-gray-800 leading-relaxed max-h-60 overflow-y-auto">
+                  {thinkingContent || '...'}
+                  {streaming && !finalContent && <span className="inline-block w-2 h-4 ml-1 bg-indigo-500 animate-pulse" />}
                 </div>
               )}
             </div>
           )}
 
-          {!displayText && !loading && !streaming ? (
+          {!finalContent && !loading && !streaming && !hasThinking ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-50"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
               <p className="text-sm">优化后的提示词将显示在这里</p>
             </div>
           ) : (
-            <div className="whitespace-pre-wrap font-mono text-sm text-gray-800 leading-relaxed">
-              {displayText}
-              {(loading || streaming) && <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse" />}
-            </div>
+            finalContent ? (
+              <div className="whitespace-pre-wrap font-mono text-sm text-gray-800 leading-relaxed">
+                {finalContent}
+                {(loading || streaming) && <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse" />}
+              </div>
+            ) : null
           )}
         </div>
       </div>

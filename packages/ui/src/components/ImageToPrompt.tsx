@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useImageToPrompt } from '../hooks/useImageToPrompt';
 import { ModelSelector } from './ModelSelector';
 import { TemplateSelector } from './TemplateSelector';
+import type { ImageService, HistoryManager } from '@text-image-prompt-tools/core';
 
 export interface TemplateOption {
   id: string;
@@ -16,6 +17,8 @@ export interface ImageToPromptProps {
   availableModels?: Array<{ id: string; name: string }>;
   availableTemplates?: TemplateOption[];
   templateManager?: any; // ITemplateManager 类型，但为了避免循环依赖使用 any
+  imageService?: ImageService;
+  historyManager?: HistoryManager;
 }
 
 
@@ -26,16 +29,45 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
   availableModels = [],
   availableTemplates = [],
   templateManager,
+  imageService,
+  historyManager,
 }) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [model, setModel] = useState(defaultModel);
   const [templateId, setTemplateId] = useState<string | undefined>(defaultTemplateId);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { extract, loading, error, result } = useImageToPrompt();
+  const { extract, loading, error, result } = useImageToPrompt(imageService, historyManager);
+
+  const templateStorageKey = 'image-prompt-template';
 
   // 过滤中文模板
   const chineseTemplates = availableTemplates.filter(t => t.language === 'zh');
+
+  // 加载模板选择
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(templateStorageKey);
+      if (saved) {
+        setTemplateId(saved);
+      }
+    } catch (e) {
+      console.warn('加载反推模板选择失败', e);
+    }
+  }, []);
+
+  // 保存模板选择
+  useEffect(() => {
+    try {
+      if (templateId) {
+        localStorage.setItem(templateStorageKey, templateId);
+      } else {
+        localStorage.removeItem(templateStorageKey);
+      }
+    } catch (e) {
+      console.warn('保存反推模板选择失败', e);
+    }
+  }, [templateId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -105,18 +137,18 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
             />
           </div>
         )}
-        
+
         <div className="flex-1 p-6 flex flex-col items-center justify-center bg-white min-h-0">
-          <input 
-            type="file" 
+          <input
+            type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
             accept="image/*"
             className="hidden"
           />
-          
+
           {!imagePreview ? (
-            <div 
+            <div
               onClick={() => fileInputRef.current?.click()}
               className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-all"
             >
@@ -127,11 +159,11 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
           ) : (
             <div className="relative w-full h-full flex flex-col items-center justify-center">
               <img src={imagePreview} alt="Upload preview" className="max-h-full max-w-full object-contain rounded-lg shadow-sm mb-4" />
-              <button 
-                onClick={() => { 
-                  setImageFile(null); 
-                  setImagePreview(''); 
-                  if (fileInputRef.current) fileInputRef.current.value = ''; 
+              <button
+                onClick={() => {
+                  setImageFile(null);
+                  setImagePreview('');
+                  if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
                 className="text-xs text-red-600 hover:text-red-700 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
@@ -173,7 +205,7 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
             分析结果
           </h3>
           {result && (
-            <button 
+            <button
               onClick={copyToClipboard}
               className="text-gray-500 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded transition-all flex items-center gap-1 text-xs font-medium"
               title="复制到剪贴板"
@@ -196,7 +228,7 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
           ) : (
             <div className="whitespace-pre-wrap font-mono text-sm text-gray-800 leading-relaxed">
               {result}
-              {loading && <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse"/>}
+              {loading && <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse" />}
             </div>
           )}
         </div>

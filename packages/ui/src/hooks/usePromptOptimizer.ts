@@ -20,12 +20,18 @@ export function setHistoryManager(manager: HistoryManager) {
   historyManagerInstance = manager;
 }
 
-export function usePromptOptimizer() {
+export function usePromptOptimizer(
+  injectedService?: PromptService,
+  injectedHistory?: HistoryManager
+) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [streamingResult, setStreamingResult] = useState<string>('');
+
+  const getPromptService = () => injectedService || promptServiceInstance;
+  const getHistoryManager = () => injectedHistory || historyManagerInstance;
 
   const optimize = async (
     prompt: string,
@@ -33,7 +39,8 @@ export function usePromptOptimizer() {
     style: PromptStyle = 'general',
     templateId?: string
   ): Promise<string | null> => {
-    if (!promptServiceInstance) {
+    const service = getPromptService();
+    if (!service) {
       setError(new Error('提示词服务未初始化'));
       return null;
     }
@@ -49,11 +56,12 @@ export function usePromptOptimizer() {
         style,
         templateId,
       };
-      const response = await promptServiceInstance.optimizePrompt(request);
+      const response = await service.optimizePrompt(request);
       setResult(response.optimizedPrompt);
-      
+
       // 保存历史记录
-      if (historyManagerInstance) {
+      const historyMgr = getHistoryManager();
+      if (historyMgr) {
         const record: PromptOptimizeRecord = {
           id: `prompt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'prompt-optimize',
@@ -63,9 +71,9 @@ export function usePromptOptimizer() {
           style,
           timestamp: Date.now(),
         };
-        await historyManagerInstance.addRecord(record);
+        await historyMgr.addRecord(record);
       }
-      
+
       return response.optimizedPrompt;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -82,7 +90,8 @@ export function usePromptOptimizer() {
     style: PromptStyle = 'general',
     templateId?: string
   ): Promise<string | null> => {
-    if (!promptServiceInstance) {
+    const service = getPromptService();
+    if (!service) {
       setError(new Error('提示词服务未初始化'));
       return null;
     }
@@ -101,7 +110,7 @@ export function usePromptOptimizer() {
         templateId,
       };
 
-      await promptServiceInstance.optimizePromptStream(request, {
+      await service.optimizePromptStream(request, {
         onChunk: (chunk) => {
           setStreamingResult((prev) => prev + chunk);
         },
@@ -111,7 +120,8 @@ export function usePromptOptimizer() {
           setStreaming(false);
           setLoading(false);
           // 保存历史记录
-          if (historyManagerInstance) {
+          const historyMgr = getHistoryManager();
+          if (historyMgr) {
             const record: PromptOptimizeRecord = {
               id: `prompt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               type: 'prompt-optimize',
@@ -121,7 +131,7 @@ export function usePromptOptimizer() {
               style,
               timestamp: Date.now(),
             };
-            void historyManagerInstance.addRecord(record);
+            void historyMgr.addRecord(record);
           }
         },
         onError: (err) => {
