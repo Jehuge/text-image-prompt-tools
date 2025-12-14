@@ -212,19 +212,19 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           const modelIds = instance.models && Array.isArray(instance.models) && instance.models.length > 0
             ? instance.models
             : (instance.model && typeof instance.model === 'string' && instance.model.trim() ? [instance.model.trim()] : []);
-          
+        
           const hasApiKey = !instance.apiKey || (instance.apiKey && typeof instance.apiKey === 'string' && instance.apiKey.trim());
-          
-          if (modelIds.length > 0 && hasApiKey) {
-            modelIds.forEach((modelId: string) => {
-              const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
-              if (!trimmedModelId) return;
-              
+        
+        if (modelIds.length > 0 && hasApiKey) {
+          modelIds.forEach((modelId: string) => {
+            const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
+            if (!trimmedModelId) return;
+            
               // 新格式：ID 包含实例 ID，格式为 provider-instanceId-modelId
               // 旧格式：ID 格式为 provider-modelId
               const instancePrefix = instance.id && instance.id !== 'default' ? `${providerId}-${instance.id}-` : `${providerId}-`;
-              const hasProviderPrefix = trimmedModelId.startsWith(`${providerId}-`);
-              const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':');
+            const hasProviderPrefix = trimmedModelId.startsWith(`${providerId}-`);
+            const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':');
               
               // 如果模型 ID 已经包含实例前缀，直接使用；否则添加实例前缀
               let optionId: string;
@@ -242,54 +242,54 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               } else {
                 optionId = `${instancePrefix}${trimmedModelId}`;
               }
-              
-              let modelName = trimmedModelId;
-              
+            
+            let modelName = trimmedModelId;
+            
               // 移除实例前缀（如果存在）用于显示
               if (modelName.startsWith(instancePrefix)) {
                 modelName = modelName.substring(instancePrefix.length);
               } else if (modelName.startsWith(`${providerId}-`)) {
                 modelName = modelName.substring(providerId.length + 1);
-              }
+            }
 
-              if (modelName.includes('/')) {
-                const parts = modelName.split('/');
-                modelName = parts[parts.length - 1];
+            if (modelName.includes('/')) {
+              const parts = modelName.split('/');
+              modelName = parts[parts.length - 1];
+            }
+            
+            if (modelName.includes(':')) {
+              const colonIndex = modelName.lastIndexOf(':');
+              if (colonIndex > 0) {
+                const baseName = modelName.substring(0, colonIndex);
+                const quantInfo = modelName.substring(colonIndex + 1);
+                modelName = `${baseName} (${quantInfo})`;
               }
-              
-              if (modelName.includes(':')) {
-                const colonIndex = modelName.lastIndexOf(':');
-                if (colonIndex > 0) {
-                  const baseName = modelName.substring(0, colonIndex);
-                  const quantInfo = modelName.substring(colonIndex + 1);
-                  modelName = `${baseName} (${quantInfo})`;
-                }
-              }
-              
+            }
+            
               // 如果有实例名称且不是默认配置，添加到显示名称
               if (instance.name && instance.name !== '默认配置' && instance.name !== 'default') {
                 modelName = `${instance.name} - ${modelName}`;
               }
               
               const capabilities = getModelCapabilities(providerId, trimmedModelId, instance as ProviderConfig);
-              
-              // 如果设置了只显示支持 Vision 的模型，进行过滤
-              if (filterVisionOnly && !capabilities.supportsVision) {
-                return;
-              }
-              
-              const modelOption: ModelOption = {
-                id: optionId,
-                name: modelName,
-                provider: providerId,
-                providerName: PROVIDER_LABELS[providerId] || providerId,
-                modelId: trimmedModelId,
-                supportsVision: capabilities.supportsVision,
-              };
-              
-              modelList.push(modelOption);
-            });
-          }
+            
+            // 如果设置了只显示支持 Vision 的模型，进行过滤
+            if (filterVisionOnly && !capabilities.supportsVision) {
+              return;
+            }
+            
+            const modelOption: ModelOption = {
+              id: optionId,
+              name: modelName,
+              provider: providerId,
+              providerName: PROVIDER_LABELS[providerId] || providerId,
+              modelId: trimmedModelId,
+              supportsVision: capabilities.supportsVision,
+            };
+            
+            modelList.push(modelOption);
+          });
+        }
         });
       });
 

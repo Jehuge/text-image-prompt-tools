@@ -292,10 +292,10 @@ function App() {
 
           const hasApiKey = !instance.apiKey || (instance.apiKey && typeof instance.apiKey === 'string' && instance.apiKey.trim());
 
-          if (modelIds.length > 0 && hasApiKey) {
-            modelIds.forEach((modelId: string) => {
-              const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
-              if (!trimmedModelId) return;
+        if (modelIds.length > 0 && hasApiKey) {
+          modelIds.forEach((modelId: string) => {
+            const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
+            if (!trimmedModelId) return;
 
               const instancePrefix = instance.id && instance.id !== 'default' ? `${providerId}-${instance.id}-` : `${providerId}-`;
               const fullId = `${instancePrefix}${trimmedModelId}`;
@@ -306,12 +306,12 @@ function App() {
                 displayName = `${instance.name} - ${displayName}`;
               }
 
-              modelList.push({
-                id: fullId,
-                name: displayName,
-              });
+            modelList.push({
+              id: fullId,
+              name: displayName,
             });
-          }
+          });
+        }
         });
       });
 
@@ -357,13 +357,13 @@ function App() {
           const hasApiKey = !instance.apiKey || (instance.apiKey && typeof instance.apiKey === 'string' && instance.apiKey.trim());
           const modelCapabilities = instance.modelCapabilities || {};
 
-          if (modelIds.length > 0 && hasApiKey) {
-            modelIds.forEach((modelId: string) => {
-              const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
-              if (!trimmedModelId) return;
+        if (modelIds.length > 0 && hasApiKey) {
+          modelIds.forEach((modelId: string) => {
+            const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
+            if (!trimmedModelId) return;
 
-              // 检查模型是否支持 Vision
-              const supportsVision = modelCapabilities[trimmedModelId]?.supportsVision || false;
+            // 检查模型是否支持 Vision
+            const supportsVision = modelCapabilities[trimmedModelId]?.supportsVision || false;
 
             // 如果明确标记为支持 Vision，或者没有能力信息（兼容旧数据），则包含
             if (supportsVision || !modelCapabilities[trimmedModelId]) {
@@ -382,7 +382,7 @@ function App() {
               });
             }
           });
-          }
+        }
         });
       });
 

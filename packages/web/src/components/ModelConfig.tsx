@@ -107,7 +107,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                 if (!oldConfig.instances && (oldConfig.apiKey || oldConfig.baseUrl || oldConfig.models)) {
                   // 转换为新格式：将旧配置转换为一个实例
                   const instanceId = generateInstanceId()
-                  initialConfigs[key] = {
+                initialConfigs[key] = {
                     provider: key,
                     instances: [{
                       id: instanceId,
@@ -352,25 +352,26 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
 
           for (const modelId of currentInstance.models) {
             const modelDef = availableModels.find(m => m.id === modelId)
+            // 直接使用从 API 返回的模型 ID，不添加任何前缀
             const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim()
-
-            // ID生成逻辑：包含实例 ID 以区分不同的配置实例
-            const instancePrefix = `${selectedProvider}-${currentInstance.id}-`
+            
+            // 生成唯一 ID：provider-modelId，用于在系统中标识
+            // 如果同一个 provider 有多个实例使用相同模型，通过 connectionConfig 来区分
             const hasProviderPrefix = trimmedModelId.startsWith(`${selectedProvider}-`)
             const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':') // Ollama model with path or HF format
             const optionId = (hasProviderPrefix || hasPathOrAlias)
-              ? `${instancePrefix}${trimmedModelId}`
-              : `${instancePrefix}${trimmedModelId}`
+              ? trimmedModelId  // 如果已经有前缀或路径，直接使用
+              : `${selectedProvider}-${trimmedModelId}`  // 否则添加 provider 前缀
 
             selectedOptionIds.add(optionId)
 
             const textModelConfig: TextModelConfig = {
               id: optionId,
-              name: modelDef?.name || optionId,
+              name: modelDef?.name || trimmedModelId,
               enabled: true,
               providerMeta,
               modelMeta: {
-                id: trimmedModelId, // 实际传递给 API 的模型 ID
+                id: trimmedModelId, // 实际传递给 API 的模型 ID（原始模型 ID，不包含任何前缀）
                 name: modelDef?.name || trimmedModelId,
                 providerId: selectedProvider,
                 capabilities: {
@@ -381,7 +382,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
               },
               connectionConfig: {
                 apiKey: currentInstance.apiKey,
-                baseURL: currentInstance.baseUrl
+                baseURL: currentInstance.baseUrl  // 通过 baseURL 区分不同的实例
               }
             }
 
@@ -777,7 +778,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
           </div>
 
           {currentInstance ? (
-            <div className="space-y-6">
+          <div className="space-y-6">
             {/* API Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

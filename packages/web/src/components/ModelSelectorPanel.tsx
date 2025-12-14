@@ -102,16 +102,16 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
           const modelIds = instance.models && Array.isArray(instance.models) && instance.models.length > 0
             ? instance.models
             : (instance.model && typeof instance.model === 'string' && instance.model.trim() ? [instance.model.trim()] : [])
-          
-          // 检查是否有 API Key（某些提供商可能不需要）
+        
+        // 检查是否有 API Key（某些提供商可能不需要）
           const hasApiKey = !instance.apiKey || (instance.apiKey && typeof instance.apiKey === 'string' && instance.apiKey.trim())
-          
-          // 只有同时满足：有模型 且 有 API Key（如果需要）才添加
-          if (modelIds.length > 0 && hasApiKey) {
-            // 遍历所有选中的模型
-            modelIds.forEach((modelId: string) => {
-              const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim()
-              if (!trimmedModelId) return
+        
+        // 只有同时满足：有模型 且 有 API Key（如果需要）才添加
+        if (modelIds.length > 0 && hasApiKey) {
+          // 遍历所有选中的模型
+          modelIds.forEach((modelId: string) => {
+            const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim()
+            if (!trimmedModelId) return
               
               // 新格式：ID 包含实例 ID，格式为 provider-instanceId-modelId
               const instancePrefix = instance.id && instance.id !== 'default' ? `${providerId}-${instance.id}-` : `${providerId}-`
@@ -124,54 +124,54 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
               } else {
                 optionId = `${instancePrefix}${trimmedModelId}`
               }
-              
-              // 模型名称处理
-              let modelName = trimmedModelId
-              
+            
+            // 模型名称处理
+            let modelName = trimmedModelId
+            
               // 移除实例前缀（如果存在）用于显示
               if (modelName.startsWith(instancePrefix)) {
                 modelName = modelName.substring(instancePrefix.length)
               } else if (modelName.startsWith(`${providerId}-`)) {
                 modelName = modelName.substring(providerId.length + 1)
+            }
+            
+            // 处理特殊格式的模型名称（如 hf.co/unsloth/Qwen3-4B-GGUF:Q6_K_XL）
+            // 提取最后一部分作为显示名称
+            if (modelName.includes('/')) {
+              const parts = modelName.split('/')
+              modelName = parts[parts.length - 1]
+            }
+            
+            // 处理量化格式（如 :Q6_K_XL），保留量化信息
+            if (modelName.includes(':')) {
+              const colonIndex = modelName.lastIndexOf(':')
+              if (colonIndex > 0) {
+                const baseName = modelName.substring(0, colonIndex)
+                const quantInfo = modelName.substring(colonIndex + 1)
+                modelName = `${baseName} (${quantInfo})`
               }
-              
-              // 处理特殊格式的模型名称（如 hf.co/unsloth/Qwen3-4B-GGUF:Q6_K_XL）
-              // 提取最后一部分作为显示名称
-              if (modelName.includes('/')) {
-                const parts = modelName.split('/')
-                modelName = parts[parts.length - 1]
-              }
-              
-              // 处理量化格式（如 :Q6_K_XL），保留量化信息
-              if (modelName.includes(':')) {
-                const colonIndex = modelName.lastIndexOf(':')
-                if (colonIndex > 0) {
-                  const baseName = modelName.substring(0, colonIndex)
-                  const quantInfo = modelName.substring(colonIndex + 1)
-                  modelName = `${baseName} (${quantInfo})`
-                }
-              }
+            }
               
               // 如果有实例名称且不是默认配置，添加到显示名称
               if (instance.name && instance.name !== '默认配置' && instance.name !== 'default') {
                 modelName = `${instance.name} - ${modelName}`
               }
-              
-              // 获取模型的能力信息（从保存的真实信息中获取）
+            
+            // 获取模型的能力信息（从保存的真实信息中获取）
               const capabilities = getModelCapabilities(providerId, trimmedModelId, instance as ProviderConfig)
-              
-              const modelOption: ModelOption = {
+            
+            const modelOption: ModelOption = {
                 id: optionId,
-                name: modelName,
-                provider: providerId,
-                providerName: PROVIDER_LABELS[providerId] || providerId,
-                modelId: trimmedModelId,
-                supportsVision: capabilities.supportsVision,
-              }
-              
-              modelList.push(modelOption)
-            })
-          }
+              name: modelName,
+              provider: providerId,
+              providerName: PROVIDER_LABELS[providerId] || providerId,
+              modelId: trimmedModelId,
+              supportsVision: capabilities.supportsVision,
+            }
+            
+            modelList.push(modelOption)
+          })
+        }
         })
       })
 
