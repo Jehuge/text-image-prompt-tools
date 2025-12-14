@@ -26,5 +26,9 @@ export class MemoryTemplateManager implements ITemplateManager {
   async saveTemplate(template: Template): Promise<void> {
     this.templates.set(template.id, template);
   }
+
+  async deleteTemplate(templateId: string): Promise<void> {
+    this.templates.delete(templateId);
+  }
 }
 

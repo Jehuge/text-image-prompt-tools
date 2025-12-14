@@ -1,18 +1,25 @@
 import { useState, useEffect, useRef } from 'react'
-import { Save, Eye, EyeOff, Key, Brain, CheckCircle2, RefreshCw, Loader2, Info, Image as ImageIcon, FileText } from 'lucide-react'
+import { Save, Eye, EyeOff, Key, Brain, CheckCircle2, RefreshCw, Loader2, Info, Image as ImageIcon, FileText, Plus, X, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { TextAdapterRegistry, TextProvider, TextModelConfig, TextModel } from '@text-image-prompt-tools/core'
 import { LocalStorageModelManager } from '@text-image-prompt-tools/core'
 import { ModelService } from '../services/modelService'
 import { ProviderIcon } from '../utils/providerIcons'
 
-interface ProviderConfig {
-  provider: string
+interface ConfigInstance {
+  id: string  // 配置实例的唯一 ID
+  name: string  // 配置实例的名称（用于区分，如 "LMStudio 本地"、"LMStudio 远程"）
   apiKey: string
   baseUrl?: string
   model: string  // 保留用于兼容，但主要使用 models
   models: string[]  // 多选的模型列表
   modelCapabilities?: Record<string, { supportsVision: boolean }>  // 保存每个模型的视觉支持信息
+}
+
+interface ProviderConfig {
+  provider: string
+  instances: ConfigInstance[]  // 支持多个配置实例
+  defaultInstanceId?: string  // 默认使用的配置实例 ID
 }
 
 interface ModelItem {
@@ -43,6 +50,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
 }) => {
   const [providers, setProviders] = useState<TextProvider[]>(initialProviders)
   const [selectedProvider, setSelectedProvider] = useState<string>(initialProviders[0]?.id || '')
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string>('')  // 当前选中的配置实例 ID
   const [configs, setConfigs] = useState<Record<string, ProviderConfig>>({})
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState(false)
@@ -53,8 +61,15 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
   const modelsCacheRef = useRef<Record<string, { models: ModelItem[], timestamp: number }>>({})
   // 防止重复加载提供商列表
   const providersLoadedRef = useRef(false)
+  // 防止重复请求的锁
+  const loadingLockRef = useRef<string | null>(null)
 
   const modelService = new ModelService(registry)
+
+  // 生成新的配置实例 ID
+  const generateInstanceId = () => {
+    return `instance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  }
 
   // 加载提供商列表
   useEffect(() => {
@@ -74,11 +89,8 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
         providerList.forEach((p: TextProvider) => {
           initialConfigs[p.id] = {
             provider: p.id,
-            apiKey: '',
-            baseUrl: p.defaultBaseURL,
-            model: '',  // 保留用于兼容
-            models: [],  // 多选的模型列表
-            modelCapabilities: {},  // 模型能力信息（从真实 API 获取）
+            instances: [],
+            defaultInstanceId: undefined,
           }
         })
 
@@ -87,16 +99,34 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
         if (savedConfigs) {
           try {
             const parsed = JSON.parse(savedConfigs)
-            // 合并已保存的配置
+            // 处理旧格式的配置（兼容性）
             Object.keys(parsed).forEach((key) => {
               if (initialConfigs[key]) {
-                initialConfigs[key] = {
-                  ...initialConfigs[key],
-                  ...parsed[key],
-                  // 确保 models 数组存在
-                  models: parsed[key].models || (parsed[key].model ? [parsed[key].model] : []),
-                  // 确保 modelCapabilities 存在
-                  modelCapabilities: parsed[key].modelCapabilities || {},
+                const oldConfig = parsed[key]
+                // 检查是否是旧格式（没有 instances 字段）
+                if (!oldConfig.instances && (oldConfig.apiKey || oldConfig.baseUrl || oldConfig.models)) {
+                  // 转换为新格式：将旧配置转换为一个实例
+                  const instanceId = generateInstanceId()
+                  initialConfigs[key] = {
+                    provider: key,
+                    instances: [{
+                      id: instanceId,
+                      name: '默认配置',
+                      apiKey: oldConfig.apiKey || '',
+                      baseUrl: oldConfig.baseUrl || providerList.find(p => p.id === key)?.defaultBaseURL || '',
+                      model: oldConfig.model || '',
+                      models: oldConfig.models || (oldConfig.model ? [oldConfig.model] : []),
+                      modelCapabilities: oldConfig.modelCapabilities || {},
+                    }],
+                    defaultInstanceId: instanceId,
+                  }
+                } else if (oldConfig.instances) {
+                  // 新格式，直接使用
+                  initialConfigs[key] = {
+                    provider: key,
+                    instances: oldConfig.instances || [],
+                    defaultInstanceId: oldConfig.defaultInstanceId,
+                  }
                 }
               }
             })
@@ -120,15 +150,27 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
     loadProviders()
   }, [])
 
-  // 当切换提供商时，从缓存加载模型列表（如果存在）
+  // 获取当前选中的配置实例
+  const getCurrentInstance = (): ConfigInstance | null => {
+    const providerConfig = configs[selectedProvider]
+    if (!providerConfig || !providerConfig.instances || providerConfig.instances.length === 0) {
+      return null
+    }
+    
+    // 如果有选中的实例 ID，使用它；否则使用默认实例或第一个实例
+    const instanceId = selectedInstanceId || providerConfig.defaultInstanceId || providerConfig.instances[0]?.id
+    return providerConfig.instances.find(inst => inst.id === instanceId) || providerConfig.instances[0] || null
+  }
+
+  // 当切换提供商或实例时，从缓存加载模型列表（如果存在）
   useEffect(() => {
-    const currentConfig = configs[selectedProvider]
-    if (!currentConfig) {
+    const currentInstance = getCurrentInstance()
+    if (!currentInstance) {
       setAvailableModels([])
       return
     }
 
-    const cacheKey = `${selectedProvider}-${currentConfig.apiKey || ''}-${currentConfig.baseUrl || ''}`
+    const cacheKey = `${selectedProvider}-${currentInstance.id}-${currentInstance.apiKey || ''}-${currentInstance.baseUrl || ''}`
     const cached = modelsCacheRef.current[cacheKey]
 
     // 如果缓存存在且未过期（5分钟内），直接使用缓存
@@ -139,38 +181,49 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
       setAvailableModels([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProvider, configs])
+  }, [selectedProvider, selectedInstanceId, configs])
 
-  const currentConfig = configs[selectedProvider] || {
-    provider: selectedProvider,
-    apiKey: '',
-    baseUrl: providers.find(p => p.id === selectedProvider)?.defaultBaseURL || '',
-    model: '',  // 保留用于兼容
-    models: [],  // 多选的模型列表
-    modelCapabilities: {},  // 模型能力信息
-  }
+  // 当切换提供商时，自动选择第一个实例或默认实例
+  useEffect(() => {
+    const providerConfig = configs[selectedProvider]
+    if (providerConfig && providerConfig.instances && providerConfig.instances.length > 0) {
+      const instanceId = providerConfig.defaultInstanceId || providerConfig.instances[0]?.id
+      if (instanceId && instanceId !== selectedInstanceId) {
+        setSelectedInstanceId(instanceId)
+      }
+    } else {
+      setSelectedInstanceId('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProvider])
 
-  // 确保 models 数组存在
-  if (!currentConfig.models) {
-    currentConfig.models = currentConfig.model ? [currentConfig.model] : []
-  }
+  const currentInstance = getCurrentInstance()
 
-  // 确保 modelCapabilities 存在
-  if (!currentConfig.modelCapabilities) {
-    currentConfig.modelCapabilities = {}
+  // 判断是否需要 API Key
+  // 对于自定义 baseURL（如 LMStudio），即使 provider 要求 API Key，也允许为空
+  const requiresApiKey = () => {
+    if (!currentInstance || !currentProvider) return false
+    const isCustomBaseURL = currentInstance.baseUrl && 
+      currentInstance.baseUrl !== currentProvider.defaultBaseURL
+    // 只有对于默认 URL 且 provider 要求 API Key 时才需要
+    return currentProvider.requiresApiKey && !isCustomBaseURL
   }
 
   const loadModels = async () => {
-    // 检查是否需要 API Key（Ollama 不需要）
-    const provider = providers.find(p => p.id === selectedProvider)
-    if (provider?.requiresApiKey && !currentConfig.apiKey?.trim()) {
+    if (!currentInstance) {
+      toast.error('请先添加配置实例')
+      return
+    }
+
+    // 检查是否需要 API Key
+    if (requiresApiKey() && !currentInstance.apiKey?.trim()) {
       toast.error('请先输入 API Key')
       setAvailableModels([])
       return
     }
 
     // 检查缓存
-    const cacheKey = `${selectedProvider}-${currentConfig.apiKey || ''}-${currentConfig.baseUrl || ''}`
+    const cacheKey = `${selectedProvider}-${currentInstance.id}-${currentInstance.apiKey || ''}-${currentInstance.baseUrl || ''}`
     const cached = modelsCacheRef.current[cacheKey]
 
     // 如果缓存存在且未过期（5分钟内），直接使用缓存
@@ -180,12 +233,20 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
       return
     }
 
+    // 防止重复请求：如果正在加载相同的配置，直接返回
+    if (loadingLockRef.current === cacheKey && loadingModels) {
+      console.log('[ModelConfig] 正在加载中，跳过重复请求')
+      return
+    }
+
+    // 设置加载锁
+    loadingLockRef.current = cacheKey
     setLoadingModels(true)
     try {
       const response = await modelService.getModelList({
         provider: selectedProvider,
-        api_key: currentConfig.apiKey || '',
-        base_url: currentConfig.baseUrl || undefined,
+        api_key: currentInstance.apiKey || '',
+        base_url: currentInstance.baseUrl || undefined,
       })
 
       if (response.code === 200) {
@@ -217,11 +278,23 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
         setAvailableModels([])
       }
     } catch (error: any) {
-      console.error('获取模型列表失败:', error)
-      toast.error(error.message || '获取模型列表失败')
+      console.error('获取模型列表失败:', {
+        error: error,
+        message: error?.message,
+        response: error?.response,
+        provider: selectedProvider,
+        baseURL: currentInstance.baseUrl,
+        hasApiKey: !!currentInstance.apiKey,
+      })
+      const errorMessage = error?.message || error?.response?.data?.message || '获取模型列表失败'
+      toast.error(errorMessage, { duration: 4000 })
       setAvailableModels([])
     } finally {
       setLoadingModels(false)
+      // 清除加载锁
+      if (loadingLockRef.current === cacheKey) {
+        loadingLockRef.current = null
+      }
     }
   }
 
@@ -229,21 +302,25 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
   useEffect(() => {
     loadModelsRef.current = loadModels
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentConfig.apiKey, currentConfig.baseUrl, selectedProvider])
+  }, [currentInstance?.apiKey, currentInstance?.baseUrl, selectedProvider, selectedInstanceId])
 
   const handleSave = async () => {
+    if (!currentInstance) {
+      toast.error('请先添加配置实例')
+      return
+    }
+
     setSaving(true)
     try {
       // 验证 API Key（如果需要）
-      const provider = providers.find(p => p.id === selectedProvider)
-      if (provider?.requiresApiKey && !currentConfig.apiKey.trim()) {
+      if (requiresApiKey() && !currentInstance.apiKey.trim()) {
         toast.error('请输入 API Key')
         setSaving(false)
         return
       }
 
       // 验证模型（至少选择一个）
-      if (!currentConfig.models || currentConfig.models.length === 0) {
+      if (!currentInstance.models || currentInstance.models.length === 0) {
         toast.error('请至少选择一个模型')
         setSaving(false)
         return
@@ -251,7 +328,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
 
       // 保存模型能力信息（从真实获取的模型列表中）
       const modelCapabilities: Record<string, { supportsVision: boolean }> = {}
-      currentConfig.models.forEach((modelId: string) => {
+      currentInstance.models.forEach((modelId: string) => {
         const model = availableModels.find((m: ModelItem) => m.id === modelId)
         if (model) {
           modelCapabilities[modelId] = {
@@ -273,16 +350,17 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
           // 找出本次选中的 ID Set
           const selectedOptionIds = new Set<string>()
 
-          for (const modelId of currentConfig.models) {
+          for (const modelId of currentInstance.models) {
             const modelDef = availableModels.find(m => m.id === modelId)
             const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim()
 
-            // ID生成逻辑需与 ModelSelector 保持一致
+            // ID生成逻辑：包含实例 ID 以区分不同的配置实例
+            const instancePrefix = `${selectedProvider}-${currentInstance.id}-`
             const hasProviderPrefix = trimmedModelId.startsWith(`${selectedProvider}-`)
             const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':') // Ollama model with path or HF format
             const optionId = (hasProviderPrefix || hasPathOrAlias)
-              ? trimmedModelId
-              : `${selectedProvider}-${trimmedModelId}`
+              ? `${instancePrefix}${trimmedModelId}`
+              : `${instancePrefix}${trimmedModelId}`
 
             selectedOptionIds.add(optionId)
 
@@ -302,8 +380,8 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                 }
               },
               connectionConfig: {
-                apiKey: currentConfig.apiKey,
-                baseURL: currentConfig.baseUrl
+                apiKey: currentInstance.apiKey,
+                baseURL: currentInstance.baseUrl
               }
             }
 
@@ -325,13 +403,21 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
         // 不中断 UI 保存流程
       }
 
+      // 更新当前实例
+      const providerConfig = configs[selectedProvider] || { provider: selectedProvider, instances: [], defaultInstanceId: undefined }
+      const updatedInstances = providerConfig.instances.map(inst => 
+        inst.id === currentInstance.id 
+          ? { ...currentInstance, modelCapabilities }
+          : inst
+      )
+
       // 保存到 localStorage - 确保保存完整的配置对象，包括所有提供商
       const updatedConfigs = {
         ...configs,  // 保留所有其他提供商的配置
         [selectedProvider]: {
-          ...currentConfig,
-          provider: selectedProvider,  // 确保 provider 字段正确
-          modelCapabilities,  // 保存视觉支持信息
+          provider: selectedProvider,
+          instances: updatedInstances,
+          defaultInstanceId: providerConfig.defaultInstanceId || currentInstance.id,
         },
       }
 
@@ -340,22 +426,8 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
         if (!updatedConfigs[provider.id]) {
           updatedConfigs[provider.id] = {
             provider: provider.id,
-            apiKey: '',
-            baseUrl: provider.defaultBaseURL,
-            model: '',  // 保留用于兼容
-            models: [],  // 多选的模型列表
-            modelCapabilities: {},  // 模型能力信息
-          }
-        } else {
-          // 确保 models 数组存在
-          if (!updatedConfigs[provider.id].models) {
-            updatedConfigs[provider.id].models = updatedConfigs[provider.id].model
-              ? [updatedConfigs[provider.id].model]
-              : []
-          }
-          // 确保 modelCapabilities 存在
-          if (!updatedConfigs[provider.id].modelCapabilities) {
-            updatedConfigs[provider.id].modelCapabilities = {}
+            instances: [],
+            defaultInstanceId: undefined,
           }
         }
       })
@@ -364,13 +436,13 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
       setConfigs(updatedConfigs)
 
       // 显示保存的配置信息
-      const selectedModelNames = currentConfig.models
+      const selectedModelNames = currentInstance.models
         .map((modelId: string) => {
           const model = availableModels.find((m: ModelItem) => m.id === modelId)
           return model?.name || modelId
         })
         .join(', ')
-      toast.success(`配置保存成功！已选择 ${currentConfig.models.length} 个模型：${selectedModelNames}`, { duration: 3000 })
+      toast.success(`配置保存成功！已选择 ${currentInstance.models.length} 个模型：${selectedModelNames}`, { duration: 3000 })
 
       // 保存后重新加载模型列表，确保显示正确
       setTimeout(() => {
@@ -383,55 +455,120 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
     }
   }
 
-  const handleConfigChange = (field: keyof ProviderConfig, value: string) => {
-    const updatedConfig = {
-      ...(configs[selectedProvider] || {
-        provider: selectedProvider,
-        apiKey: '',
-        baseUrl: providers.find(p => p.id === selectedProvider)?.defaultBaseURL || '',
-        model: '',
-        models: [],
-        modelCapabilities: {},
-      }),
-      [field]: value,
-    }
+  const handleConfigChange = (field: keyof ConfigInstance, value: string) => {
+    if (!currentInstance) return
 
-    // 确保 models 数组存在
-    if (!updatedConfig.models) {
-      updatedConfig.models = []
-    }
-
-    // 确保 modelCapabilities 存在
-    if (!updatedConfig.modelCapabilities) {
-      updatedConfig.modelCapabilities = {}
-    }
+    const providerConfig = configs[selectedProvider] || { provider: selectedProvider, instances: [], defaultInstanceId: undefined }
+    const updatedInstances = providerConfig.instances.map(inst => 
+      inst.id === currentInstance.id 
+        ? { ...inst, [field]: value }
+        : inst
+    )
 
     setConfigs((prev) => ({
       ...prev,
-      [selectedProvider]: updatedConfig,
+      [selectedProvider]: {
+        ...providerConfig,
+        instances: updatedInstances,
+      },
     }))
   }
 
   // 处理模型多选
   const handleModelToggle = (modelId: string) => {
-    const currentModels = currentConfig.models || []
+    if (!currentInstance) return
+
+    const currentModels = currentInstance.models || []
     const isSelected = currentModels.includes(modelId)
 
     const updatedModels = isSelected
       ? currentModels.filter((id: string) => id !== modelId)
       : [...currentModels, modelId]
 
-    // 直接更新 configs，避免 handleConfigChange 的类型问题
-    const updatedConfig = {
-      ...currentConfig,
-      models: updatedModels,
-      model: updatedModels.length > 0 ? updatedModels[0] : '',  // 兼容字段
-    }
+    const providerConfig = configs[selectedProvider] || { provider: selectedProvider, instances: [], defaultInstanceId: undefined }
+    const updatedInstances = providerConfig.instances.map(inst => 
+      inst.id === currentInstance.id 
+        ? { ...inst, models: updatedModels, model: updatedModels.length > 0 ? updatedModels[0] : '' }
+        : inst
+    )
 
     setConfigs((prev) => ({
       ...prev,
-      [selectedProvider]: updatedConfig,
+      [selectedProvider]: {
+        ...providerConfig,
+        instances: updatedInstances,
+      },
     }))
+  }
+
+  // 添加新的配置实例
+  const handleAddInstance = () => {
+    const provider = providers.find(p => p.id === selectedProvider)
+    const newInstance: ConfigInstance = {
+      id: generateInstanceId(),
+      name: `配置 ${(configs[selectedProvider]?.instances?.length || 0) + 1}`,
+      apiKey: '',
+      baseUrl: provider?.defaultBaseURL || '',
+      model: '',
+      models: [],
+      modelCapabilities: {},
+    }
+
+    const providerConfig = configs[selectedProvider] || { provider: selectedProvider, instances: [], defaultInstanceId: undefined }
+    const updatedInstances = [...(providerConfig.instances || []), newInstance]
+
+    setConfigs((prev) => ({
+      ...prev,
+      [selectedProvider]: {
+        ...providerConfig,
+        instances: updatedInstances,
+        defaultInstanceId: newInstance.id,
+      },
+    }))
+
+    setSelectedInstanceId(newInstance.id)
+    toast.success('已添加新配置实例')
+  }
+
+  // 删除配置实例
+  const handleDeleteInstance = (instanceId: string) => {
+    if (!currentInstance) return
+
+    const providerConfig = configs[selectedProvider]
+    if (!providerConfig || !providerConfig.instances) return
+
+    if (providerConfig.instances.length <= 1) {
+      toast.error('至少需要保留一个配置实例')
+      return
+    }
+
+    if (!confirm('确定要删除此配置实例吗？')) {
+      return
+    }
+
+    const updatedInstances = providerConfig.instances.filter(inst => inst.id !== instanceId)
+    const newDefaultInstanceId = updatedInstances.length > 0 ? updatedInstances[0].id : undefined
+
+    setConfigs((prev) => ({
+      ...prev,
+      [selectedProvider]: {
+        ...providerConfig,
+        instances: updatedInstances,
+        defaultInstanceId: newDefaultInstanceId,
+      },
+    }))
+
+    if (selectedInstanceId === instanceId) {
+      setSelectedInstanceId(newDefaultInstanceId || '')
+    }
+
+    toast.success('已删除配置实例')
+  }
+
+  // 切换配置实例
+  const handleSwitchInstance = (instanceId: string) => {
+    setSelectedInstanceId(instanceId)
+    setAvailableModels([]) // 清空模型列表，等待重新加载
   }
 
   const toggleApiKeyVisibility = (provider: string) => {
@@ -442,8 +579,12 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
   }
 
   const testConnection = async () => {
-    const provider = providers.find(p => p.id === selectedProvider)
-    if (provider?.requiresApiKey && !currentConfig.apiKey.trim()) {
+    if (!currentInstance) {
+      toast.error('请先添加配置实例')
+      return
+    }
+
+    if (requiresApiKey() && !currentInstance.apiKey.trim()) {
       toast.error('请先输入 API Key')
       return
     }
@@ -453,8 +594,8 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
     try {
       const response = await modelService.testModelConnection({
         provider: selectedProvider,
-        api_key: currentConfig.apiKey || '',
-        base_url: currentConfig.baseUrl || undefined,
+        api_key: currentInstance.apiKey || '',
+        base_url: currentInstance.baseUrl || undefined,
       })
 
       if (response.code === 200) {
@@ -472,7 +613,9 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
   }
 
   const currentProvider = providers.find(p => p.id === selectedProvider)
-  const selectedModel = availableModels.find(m => m.id === currentConfig.model)
+  const selectedModel = availableModels.find(m => m.id === currentInstance?.model)
+  const providerConfig = configs[selectedProvider]
+  const instances = providerConfig?.instances || []
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-6">
@@ -488,8 +631,8 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {providers.map((provider) => {
               const providerConfig = configs[provider.id]
-              const hasConfig = providerConfig && (!provider.requiresApiKey || providerConfig.apiKey?.trim())
-              const hasModel = providerConfig?.models?.length > 0
+              const hasInstances = providerConfig?.instances && providerConfig.instances.length > 0
+              const hasModel = providerConfig?.instances?.some(inst => inst.models && inst.models.length > 0) || false
 
               return (
                 <button
@@ -505,9 +648,9 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                   </div>
                   <div className="text-center">
                     <div className="text-sm font-medium text-gray-900">{provider.name}</div>
-                    {hasConfig && (
+                    {hasInstances && (
                       <div className="text-xs text-green-600 mt-0.5">
-                        {hasModel ? '已配置' : '未选择模型'}
+                        {hasModel ? `${providerConfig.instances.length} 个实例已配置` : `${providerConfig.instances.length} 个实例`}
                       </div>
                     )}
                   </div>
@@ -539,27 +682,122 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
             )}
           </div>
 
-          <div className="space-y-6">
+          {/* 配置实例管理 */}
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">
+                配置实例
+              </label>
+              <button
+                onClick={handleAddInstance}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                title="添加新配置实例"
+              >
+                <Plus className="w-3 h-3" />
+                添加实例
+              </button>
+            </div>
+            {instances.length === 0 ? (
+              <div className="px-4 py-3 border border-dashed border-gray-300 rounded-lg bg-gray-50 text-center">
+                <p className="text-sm text-gray-500 mb-2">暂无配置实例</p>
+                <button
+                  onClick={handleAddInstance}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  点击添加第一个配置实例
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {instances.map((instance) => (
+                  <div
+                    key={instance.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      selectedInstanceId === instance.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <button
+                      onClick={() => handleSwitchInstance(instance.id)}
+                      className="flex-1 text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <input
+                            type="text"
+                            value={instance.name}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              const providerConfig = configs[selectedProvider]
+                              if (!providerConfig) return
+                              const updatedInstances = providerConfig.instances.map(inst =>
+                                inst.id === instance.id ? { ...inst, name: e.target.value } : inst
+                              )
+                              setConfigs(prev => ({
+                                ...prev,
+                                [selectedProvider]: {
+                                  ...providerConfig,
+                                  instances: updatedInstances,
+                                },
+                              }))
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={(e) => e.stopPropagation()}
+                            className="text-sm font-medium text-gray-900 bg-transparent border-none p-0 focus:outline-none focus:ring-0 w-full"
+                            placeholder="配置名称"
+                          />
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {instance.baseUrl || '未设置 Base URL'}
+                            {instance.models.length > 0 && (
+                              <span className="ml-2 text-green-600">
+                                • {instance.models.length} 个模型
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {selectedInstanceId === instance.id && (
+                          <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                        )}
+                      </div>
+                    </button>
+                    {instances.length > 1 && (
+                      <button
+                        onClick={() => handleDeleteInstance(instance.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="删除配置实例"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {currentInstance ? (
+            <div className="space-y-6">
             {/* API Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Key className="w-4 h-4 inline mr-1" />
                 API Key
-                {currentProvider?.requiresApiKey && <span className="text-red-500 ml-1">*</span>}
-                {!currentProvider?.requiresApiKey && <span className="text-gray-400 ml-1 text-xs">(可选)</span>}
-                {currentConfig.apiKey && (
+                {requiresApiKey() && <span className="text-red-500 ml-1">*</span>}
+                {!requiresApiKey() && <span className="text-gray-400 ml-1 text-xs">(可选)</span>}
+                {currentInstance.apiKey && (
                   <span className="ml-2 text-xs text-green-600">✓ 已配置</span>
                 )}
               </label>
               <div className="relative">
                 <input
                   type={showApiKeys[selectedProvider] ? 'text' : 'password'}
-                  value={currentConfig.apiKey || ''}
+                  value={currentInstance.apiKey || ''}
                   onChange={(e) => handleConfigChange('apiKey', e.target.value)}
-                  placeholder={currentProvider?.requiresApiKey ? `请输入 ${currentProvider?.name || '提供商'} API Key` : 'API Key（可选）'}
+                  placeholder={requiresApiKey() ? `请输入 ${currentProvider?.name || '提供商'} API Key` : 'API Key（可选，LMStudio 等本地服务可留空）'}
                   className="w-full px-4 py-2.5 bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 placeholder-gray-400"
                 />
-                {currentProvider?.requiresApiKey && (
+                {requiresApiKey() && (
                   <button
                     type="button"
                     onClick={() => toggleApiKeyVisibility(selectedProvider)}
@@ -577,7 +815,9 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
               <p className="text-xs text-gray-500 mt-1">
                 {selectedProvider === 'ollama'
                   ? 'Ollama 是本地服务，不需要 API Key。确保 Ollama 服务正在运行（默认地址：http://127.0.0.1:11434）'
-                  : '请前往对应提供商的官网获取 API Key'}
+                  : requiresApiKey()
+                    ? '请前往对应提供商的官网获取 API Key'
+                    : '对于自定义 Base URL（如 LMStudio），API Key 可以留空'}
               </p>
             </div>
 
@@ -588,13 +828,13 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
               </label>
               <input
                 type="text"
-                value={currentConfig.baseUrl || ''}
+                value={currentInstance.baseUrl || ''}
                 onChange={(e) => handleConfigChange('baseUrl', e.target.value)}
                 placeholder={currentProvider?.defaultBaseURL || ''}
                 className="w-full px-4 py-2.5 bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400"
               />
               <p className="text-xs text-gray-500 mt-1">
-                默认值已自动填充，通常无需修改
+                默认值已自动填充，通常无需修改。可以配置不同的 Base URL 来连接多个服务实例（如多个 LMStudio）
               </p>
             </div>
 
@@ -604,17 +844,17 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                 <label className="block text-sm font-medium text-gray-700">
                   <Brain className="w-4 h-4 inline mr-1" />
                   选择模型（可多选）
-                  {currentConfig.models && currentConfig.models.length > 0 && (
+                  {currentInstance.models && currentInstance.models.length > 0 && (
                     <span className="ml-2 text-xs text-green-600">
-                      ✓ 已选择 {currentConfig.models.length} 个
+                      ✓ 已选择 {currentInstance.models.length} 个
                     </span>
                   )}
                 </label>
                 <button
                   onClick={loadModels}
-                  disabled={loadingModels || (currentProvider?.requiresApiKey && !currentConfig.apiKey?.trim())}
+                  disabled={loadingModels || (requiresApiKey() && !currentInstance.apiKey?.trim())}
                   className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-                  title={currentProvider?.requiresApiKey && !currentConfig.apiKey?.trim() ? '请先输入 API Key' : '刷新模型列表'}
+                  title={requiresApiKey() && !currentInstance.apiKey?.trim() ? '请先输入 API Key' : '刷新模型列表'}
                 >
                   <RefreshCw className={`w-3 h-3 ${loadingModels ? 'animate-spin' : ''}`} />
                   {loadingModels ? '加载中...' : '刷新列表'}
@@ -630,7 +870,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                 <div className="border border-gray-300 rounded-lg p-4 max-h-60 overflow-y-auto bg-gray-50">
                   <div className="space-y-2">
                     {availableModels.map((model) => {
-                      const isSelected = (currentConfig.models || []).includes(model.id)
+                      const isSelected = (currentInstance.models || []).includes(model.id)
                       return (
                         <label
                           key={model.id}
@@ -678,7 +918,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                     })}
                   </div>
                 </div>
-              ) : currentConfig.apiKey || !currentProvider?.requiresApiKey ? (
+              ) : currentInstance.apiKey || !requiresApiKey() ? (
                 <div className="px-4 py-2.5 border border-yellow-300 bg-yellow-50 rounded-lg text-sm text-yellow-800">
                   点击"测试连接"或"刷新列表"来加载模型列表
                 </div>
@@ -688,7 +928,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                 </div>
               )}
               <p className="text-xs text-gray-500 mt-1">
-                可以多选模型，然后在顶部"选择当前使用的模型"中选择要使用的模型
+                可以多选模型，然后在首页查看任务时使用已配置的模型
               </p>
             </div>
 
@@ -696,7 +936,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
             <div className="flex gap-3 pt-4 border-t border-gray-200">
               <button
                 onClick={testConnection}
-                disabled={currentProvider?.requiresApiKey && !currentConfig.apiKey?.trim()}
+                disabled={requiresApiKey() && !currentInstance.apiKey?.trim()}
                 className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CheckCircle2 className="w-4 h-4" />
@@ -704,7 +944,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || !currentConfig.models || currentConfig.models.length === 0}
+                disabled={saving || !currentInstance.models || currentInstance.models.length === 0}
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" />
@@ -712,6 +952,11 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
               </button>
             </div>
           </div>
+          ) : (
+            <div className="px-4 py-8 border border-dashed border-gray-300 rounded-lg bg-gray-50 text-center">
+              <p className="text-sm text-gray-500">请先添加配置实例</p>
+            </div>
+          )}
         </div>
 
         {/* 使用提示 */}

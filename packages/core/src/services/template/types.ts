@@ -33,5 +33,7 @@ export interface ITemplateManager {
   getTemplate(templateId: string): Promise<Template | null>;
   getAllTemplates(): Promise<Template[]>;
   saveTemplate(template: Template): Promise<void>;
+  deleteTemplate(templateId: string): Promise<void>;
+  isDefaultTemplate?(templateId: string): boolean;
 }
 

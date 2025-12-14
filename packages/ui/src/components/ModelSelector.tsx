@@ -190,63 +190,107 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           return;
         }
         
-        const modelIds = config.models && Array.isArray(config.models) && config.models.length > 0
-          ? config.models
-          : (config.model && typeof config.model === 'string' && config.model.trim() ? [config.model.trim()] : []);
-        
-        const hasApiKey = !config.apiKey || (config.apiKey && typeof config.apiKey === 'string' && config.apiKey.trim());
-        
-        if (modelIds.length > 0 && hasApiKey) {
-          modelIds.forEach((modelId: string) => {
-            const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
-            if (!trimmedModelId) return;
-            
-            // 规则：以用户保存的模型ID为准；仅在缺少 provider 前缀且不含路径/冒号时补前缀
-            const hasProviderPrefix = trimmedModelId.startsWith(`${providerId}-`);
-            const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':');
-            const optionId = hasProviderPrefix || hasPathOrAlias
-              ? trimmedModelId
-              : `${providerId}-${trimmedModelId}`;
-            
-            let modelName = trimmedModelId;
-            
-            if (trimmedModelId.startsWith(providerId + '-')) {
-              modelName = trimmedModelId.substring(providerId.length + 1);
-            }
-
-            if (modelName.includes('/')) {
-              const parts = modelName.split('/');
-              modelName = parts[parts.length - 1];
-            }
-            
-            if (modelName.includes(':')) {
-              const colonIndex = modelName.lastIndexOf(':');
-              if (colonIndex > 0) {
-                const baseName = modelName.substring(0, colonIndex);
-                const quantInfo = modelName.substring(colonIndex + 1);
-                modelName = `${baseName} (${quantInfo})`;
-              }
-            }
-            
-            const capabilities = getModelCapabilities(providerId, trimmedModelId, config as ProviderConfig);
-            
-            // 如果设置了只显示支持 Vision 的模型，进行过滤
-            if (filterVisionOnly && !capabilities.supportsVision) {
-              return;
-            }
-            
-            const modelOption: ModelOption = {
-              id: optionId,
-              name: modelName,
-              provider: providerId,
-              providerName: PROVIDER_LABELS[providerId] || providerId,
-              modelId: trimmedModelId,
-              supportsVision: capabilities.supportsVision,
-            };
-            
-            modelList.push(modelOption);
-          });
+        // 支持新格式（instances）和旧格式（兼容性）
+        let instances: any[] = [];
+        if (config.instances && Array.isArray(config.instances)) {
+          // 新格式：使用 instances 数组
+          instances = config.instances;
+        } else if (config.apiKey || config.baseUrl || config.models || config.model) {
+          // 旧格式：转换为单个实例
+          instances = [{
+            id: 'default',
+            name: '默认配置',
+            apiKey: config.apiKey || '',
+            baseUrl: config.baseUrl || '',
+            models: config.models || (config.model ? [config.model] : []),
+            modelCapabilities: config.modelCapabilities || {},
+          }];
         }
+        
+        // 遍历所有实例
+        instances.forEach((instance: any) => {
+          const modelIds = instance.models && Array.isArray(instance.models) && instance.models.length > 0
+            ? instance.models
+            : (instance.model && typeof instance.model === 'string' && instance.model.trim() ? [instance.model.trim()] : []);
+          
+          const hasApiKey = !instance.apiKey || (instance.apiKey && typeof instance.apiKey === 'string' && instance.apiKey.trim());
+          
+          if (modelIds.length > 0 && hasApiKey) {
+            modelIds.forEach((modelId: string) => {
+              const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
+              if (!trimmedModelId) return;
+              
+              // 新格式：ID 包含实例 ID，格式为 provider-instanceId-modelId
+              // 旧格式：ID 格式为 provider-modelId
+              const instancePrefix = instance.id && instance.id !== 'default' ? `${providerId}-${instance.id}-` : `${providerId}-`;
+              const hasProviderPrefix = trimmedModelId.startsWith(`${providerId}-`);
+              const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':');
+              
+              // 如果模型 ID 已经包含实例前缀，直接使用；否则添加实例前缀
+              let optionId: string;
+              if (trimmedModelId.startsWith(instancePrefix)) {
+                optionId = trimmedModelId;
+              } else if (hasProviderPrefix || hasPathOrAlias) {
+                // 如果已经有 provider 前缀或路径，需要替换或添加实例前缀
+                if (trimmedModelId.startsWith(`${providerId}-`)) {
+                  // 移除旧的 provider 前缀，添加新的实例前缀
+                  const modelIdWithoutPrefix = trimmedModelId.substring(providerId.length + 1);
+                  optionId = `${instancePrefix}${modelIdWithoutPrefix}`;
+                } else {
+                  optionId = `${instancePrefix}${trimmedModelId}`;
+                }
+              } else {
+                optionId = `${instancePrefix}${trimmedModelId}`;
+              }
+              
+              let modelName = trimmedModelId;
+              
+              // 移除实例前缀（如果存在）用于显示
+              if (modelName.startsWith(instancePrefix)) {
+                modelName = modelName.substring(instancePrefix.length);
+              } else if (modelName.startsWith(`${providerId}-`)) {
+                modelName = modelName.substring(providerId.length + 1);
+              }
+
+              if (modelName.includes('/')) {
+                const parts = modelName.split('/');
+                modelName = parts[parts.length - 1];
+              }
+              
+              if (modelName.includes(':')) {
+                const colonIndex = modelName.lastIndexOf(':');
+                if (colonIndex > 0) {
+                  const baseName = modelName.substring(0, colonIndex);
+                  const quantInfo = modelName.substring(colonIndex + 1);
+                  modelName = `${baseName} (${quantInfo})`;
+                }
+              }
+              
+              // 如果有实例名称且不是默认配置，添加到显示名称
+              if (instance.name && instance.name !== '默认配置' && instance.name !== 'default') {
+                modelName = `${instance.name} - ${modelName}`;
+              }
+              
+              const capabilities = getModelCapabilities(providerId, trimmedModelId, instance as ProviderConfig);
+              
+              // 如果设置了只显示支持 Vision 的模型，进行过滤
+              if (filterVisionOnly && !capabilities.supportsVision) {
+                return;
+              }
+              
+              const modelOption: ModelOption = {
+                id: optionId,
+                name: modelName,
+                provider: providerId,
+                providerName: PROVIDER_LABELS[providerId] || providerId,
+                modelId: trimmedModelId,
+                supportsVision: capabilities.supportsVision,
+              };
+              
+              modelList.push(modelOption);
+            });
+          }
+        });
       });
 
       modelList.sort((a, b) => {

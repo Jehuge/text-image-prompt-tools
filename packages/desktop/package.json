@@ -10,9 +10,13 @@
     "build": "node build.js",
     "build:watch": "vite build --watch",
     "build:electron": "pnpm build && electron-builder",
-    "build:pkg": "pnpm build && electron-builder --mac",
+    "build:pkg": "pnpm build && pnpm build:pkg:x64 && rm -f release/distribution.xml 2>/dev/null || true && pnpm build:pkg:arm64",
+    "build:pkg:all": "pnpm build && pnpm build:pkg:x64 && pnpm build:pkg:arm64",
     "build:pkg:x64": "pnpm build && electron-builder --mac --x64",
     "build:pkg:arm64": "pnpm build && electron-builder --mac --arm64",
+    "build:win": "pnpm build && electron-builder --win",
+    "build:win:nsis": "pnpm build && electron-builder --win --x64 --config.win.target=nsis",
+    "build:win:portable": "pnpm build && electron-builder --win --x64 --config.win.target=portable",
     "clean:release": "rm -rf release",
     "prebuild:electron": "pnpm build"
   },
@@ -29,6 +33,29 @@
         }
       ]
     },
+    "pkg": {
+      "installLocation": "/Applications"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "提示词优化工具"
+    },
     "files": [
       "dist/main.js",
       "dist/preload.js",
@@ -40,9 +67,6 @@
     },
     "directories": {
       "output": "release"
-    },
-    "pkg": {
-      "installLocation": "/Applications"
     }
   },
   "devDependencies": {

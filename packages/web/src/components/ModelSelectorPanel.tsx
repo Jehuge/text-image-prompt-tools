@@ -80,62 +80,99 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
           return
         }
         
-        // 检查是否已配置：有模型ID（支持 models 数组或 model 字符串），且（不需要 API Key 或 有 API Key）
-        // 优先使用 models 数组，如果没有则使用 model 字符串（兼容旧版本）
-        const modelIds = config.models && Array.isArray(config.models) && config.models.length > 0
-          ? config.models
-          : (config.model && typeof config.model === 'string' && config.model.trim() ? [config.model.trim()] : [])
-        
-        // 检查是否有 API Key（某些提供商可能不需要）
-        const hasApiKey = !config.apiKey || (config.apiKey && typeof config.apiKey === 'string' && config.apiKey.trim())
-        
-        // 只有同时满足：有模型 且 有 API Key（如果需要）才添加
-        if (modelIds.length > 0 && hasApiKey) {
-          // 遍历所有选中的模型
-          modelIds.forEach((modelId: string) => {
-            const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim()
-            if (!trimmedModelId) return
-            
-            // 模型名称处理
-            let modelName = trimmedModelId
-            
-            // 如果 modelId 包含提供商前缀（如 openai-gpt-4o），提取后面的部分
-            if (trimmedModelId.startsWith(providerId + '-')) {
-              modelName = trimmedModelId.substring(providerId.length + 1)
-            }
-            
-            // 处理特殊格式的模型名称（如 hf.co/unsloth/Qwen3-4B-GGUF:Q6_K_XL）
-            // 提取最后一部分作为显示名称
-            if (modelName.includes('/')) {
-              const parts = modelName.split('/')
-              modelName = parts[parts.length - 1]
-            }
-            
-            // 处理量化格式（如 :Q6_K_XL），保留量化信息
-            if (modelName.includes(':')) {
-              const colonIndex = modelName.lastIndexOf(':')
-              if (colonIndex > 0) {
-                const baseName = modelName.substring(0, colonIndex)
-                const quantInfo = modelName.substring(colonIndex + 1)
-                modelName = `${baseName} (${quantInfo})`
-              }
-            }
-            
-            // 获取模型的能力信息（从保存的真实信息中获取）
-            const capabilities = getModelCapabilities(providerId, trimmedModelId, config as ProviderConfig)
-            
-            const modelOption: ModelOption = {
-              id: `${providerId}-${trimmedModelId}`,
-              name: modelName,
-              provider: providerId,
-              providerName: PROVIDER_LABELS[providerId] || providerId,
-              modelId: trimmedModelId,
-              supportsVision: capabilities.supportsVision,
-            }
-            
-            modelList.push(modelOption)
-          })
+        // 支持新格式（instances）和旧格式（兼容性）
+        let instances: any[] = []
+        if (config.instances && Array.isArray(config.instances)) {
+          // 新格式：使用 instances 数组
+          instances = config.instances
+        } else if (config.apiKey || config.baseUrl || config.models || config.model) {
+          // 旧格式：转换为单个实例
+          instances = [{
+            id: 'default',
+            name: '默认配置',
+            apiKey: config.apiKey || '',
+            baseUrl: config.baseUrl || '',
+            models: config.models || (config.model ? [config.model] : []),
+            modelCapabilities: config.modelCapabilities || {},
+          }]
         }
+        
+        // 遍历所有实例
+        instances.forEach((instance: any) => {
+          const modelIds = instance.models && Array.isArray(instance.models) && instance.models.length > 0
+            ? instance.models
+            : (instance.model && typeof instance.model === 'string' && instance.model.trim() ? [instance.model.trim()] : [])
+          
+          // 检查是否有 API Key（某些提供商可能不需要）
+          const hasApiKey = !instance.apiKey || (instance.apiKey && typeof instance.apiKey === 'string' && instance.apiKey.trim())
+          
+          // 只有同时满足：有模型 且 有 API Key（如果需要）才添加
+          if (modelIds.length > 0 && hasApiKey) {
+            // 遍历所有选中的模型
+            modelIds.forEach((modelId: string) => {
+              const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim()
+              if (!trimmedModelId) return
+              
+              // 新格式：ID 包含实例 ID，格式为 provider-instanceId-modelId
+              const instancePrefix = instance.id && instance.id !== 'default' ? `${providerId}-${instance.id}-` : `${providerId}-`
+              let optionId: string
+              if (trimmedModelId.startsWith(instancePrefix)) {
+                optionId = trimmedModelId
+              } else if (trimmedModelId.startsWith(`${providerId}-`)) {
+                const modelIdWithoutPrefix = trimmedModelId.substring(providerId.length + 1)
+                optionId = `${instancePrefix}${modelIdWithoutPrefix}`
+              } else {
+                optionId = `${instancePrefix}${trimmedModelId}`
+              }
+              
+              // 模型名称处理
+              let modelName = trimmedModelId
+              
+              // 移除实例前缀（如果存在）用于显示
+              if (modelName.startsWith(instancePrefix)) {
+                modelName = modelName.substring(instancePrefix.length)
+              } else if (modelName.startsWith(`${providerId}-`)) {
+                modelName = modelName.substring(providerId.length + 1)
+              }
+              
+              // 处理特殊格式的模型名称（如 hf.co/unsloth/Qwen3-4B-GGUF:Q6_K_XL）
+              // 提取最后一部分作为显示名称
+              if (modelName.includes('/')) {
+                const parts = modelName.split('/')
+                modelName = parts[parts.length - 1]
+              }
+              
+              // 处理量化格式（如 :Q6_K_XL），保留量化信息
+              if (modelName.includes(':')) {
+                const colonIndex = modelName.lastIndexOf(':')
+                if (colonIndex > 0) {
+                  const baseName = modelName.substring(0, colonIndex)
+                  const quantInfo = modelName.substring(colonIndex + 1)
+                  modelName = `${baseName} (${quantInfo})`
+                }
+              }
+              
+              // 如果有实例名称且不是默认配置，添加到显示名称
+              if (instance.name && instance.name !== '默认配置' && instance.name !== 'default') {
+                modelName = `${instance.name} - ${modelName}`
+              }
+              
+              // 获取模型的能力信息（从保存的真实信息中获取）
+              const capabilities = getModelCapabilities(providerId, trimmedModelId, instance as ProviderConfig)
+              
+              const modelOption: ModelOption = {
+                id: optionId,
+                name: modelName,
+                provider: providerId,
+                providerName: PROVIDER_LABELS[providerId] || providerId,
+                modelId: trimmedModelId,
+                supportsVision: capabilities.supportsVision,
+              }
+              
+              modelList.push(modelOption)
+            })
+          }
+        })
       })
 
       // 按提供商名称排序，然后按模型名称排序

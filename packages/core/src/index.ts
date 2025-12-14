@@ -18,6 +18,7 @@ export * from './services/llm/adapters/ollama-adapter';
 // 导出模板
 export * from './services/template/types';
 export * from './services/template/manager';
+export * from './services/template/localStorage-manager';
 
 // 导出模型管理器
 export * from './services/model/types';
