@@ -169,6 +169,8 @@ export class OpenAIAdapter implements ITextProviderAdapter {
             modelIdLower.includes('vision') || 
             modelIdLower.includes('vl') ||  // 视觉模型标识，如 qwen3-vl
             modelIdLower.includes('4') ||
+            modelIdLower.includes('gpt-5') ||  // GPT-5 系列支持视觉
+            modelIdLower.includes('gpt5') ||   // GPT5 系列支持视觉（兼容不同命名格式）
             modelIdLower.includes('llava') ||
             (modelIdLower.includes('qwen') && (modelIdLower.includes('vision') || modelIdLower.includes('vl')));
 
@@ -222,6 +224,8 @@ export class OpenAIAdapter implements ITextProviderAdapter {
           return modelIdLower.includes('vision') || 
                  modelIdLower.includes('vl') ||  // 视觉模型标识，如 qwen3-vl
                  modelIdLower.includes('4') ||
+                 modelIdLower.includes('gpt-5') ||  // GPT-5 系列支持视觉
+                 modelIdLower.includes('gpt5') ||   // GPT5 系列支持视觉（兼容不同命名格式）
                  modelIdLower.includes('llava');
         })(),
         maxContextLength: 128000,

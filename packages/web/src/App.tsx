@@ -35,10 +35,9 @@ import {
 } from '@text-image-prompt-tools/ui';
 import { ModelConfig } from './components/ModelConfig';
 import { HistoryPanel } from './components/HistoryPanel';
-import { TemplateManager } from './components/TemplateManager';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'optimize' | 'extract' | 'config' | 'history' | 'templates'>('optimize');
+  const [activeTab, setActiveTab] = useState<'optimize' | 'extract' | 'config' | 'history'>('optimize');
   const [servicesInitialized, setServicesInitialized] = useState(false);
   const [modelManager, setModelManager] = useState<LocalStorageModelManager | null>(null);
   const [historyManager, setHistoryManager] = useState<HistoryManager | null>(null);
@@ -98,16 +97,18 @@ function App() {
       const templateMgr = new LocalStorageTemplateManager();
       setTemplateManager(templateMgr);
 
-      // 获取所有模板并分类
+      // 获取所有模板并分类（只保留文生图和图片反推相关模板）
       const refreshTemplatesInternal = async () => {
         const allTemplates = await templateMgr.getAllTemplates();
+        // 只保留文生图提示词优化模板
         const optimizeTemplatesList = allTemplates
-          .filter(t => t.metadata.templateType === 'optimize' || t.metadata.templateType === 'text2imageOptimize')
+          .filter(t => t.metadata.templateType === 'text2imageOptimize')
           .map(t => ({
             id: t.id,
             name: t.name,
             language: t.metadata.language,
           }));
+        // 只保留图片反推模板
         const image2promptTemplatesList = allTemplates
           .filter(t => t.metadata.templateType === 'image2prompt')
           .map(t => ({
@@ -149,17 +150,19 @@ function App() {
     initServices();
   }, []);
 
-  // 刷新模板列表
+  // 刷新模板列表（只保留文生图和图片反推相关模板）
   const refreshTemplates = async () => {
     if (!templateManager) return;
     const allTemplates = await templateManager.getAllTemplates();
+    // 只保留文生图提示词优化模板
     const optimizeTemplatesList = allTemplates
-      .filter(t => t.metadata.templateType === 'optimize' || t.metadata.templateType === 'text2imageOptimize')
+      .filter(t => t.metadata.templateType === 'text2imageOptimize')
       .map(t => ({
         id: t.id,
         name: t.name,
         language: t.metadata.language,
       }));
+    // 只保留图片反推模板
     const image2promptTemplatesList = allTemplates
       .filter(t => t.metadata.templateType === 'image2prompt')
       .map(t => ({
@@ -171,13 +174,6 @@ function App() {
     setOptimizeTemplates(optimizeTemplatesList);
     setImage2promptTemplates(image2promptTemplatesList);
   };
-
-  // 当从模板管理页面切换回来时，刷新模板列表
-  useEffect(() => {
-    if (activeTab !== 'templates' && templateManager) {
-      refreshTemplates();
-    }
-  }, [activeTab, templateManager]);
 
   const handleSaveModel = async (config: TextModelConfig) => {
     if (modelManager) {
@@ -265,7 +261,7 @@ function App() {
       if (!savedConfigs) return [];
 
       const configs = JSON.parse(savedConfigs);
-      const modelList: Array<{ id: string; name: string }> = [];
+      const modelList: Array<{ id: string; name: string; supportsVision?: boolean }> = [];
 
       Object.entries(configs).forEach(([providerId, config]: [string, any]) => {
         if (!config || typeof config !== 'object') return;
@@ -292,26 +288,45 @@ function App() {
 
           const hasApiKey = !instance.apiKey || (instance.apiKey && typeof instance.apiKey === 'string' && instance.apiKey.trim());
 
-        if (modelIds.length > 0 && hasApiKey) {
-          modelIds.forEach((modelId: string) => {
-            const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
-            if (!trimmedModelId) return;
+          if (modelIds.length > 0 && hasApiKey) {
+            modelIds.forEach((modelId: string) => {
+              const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
+              if (!trimmedModelId) return;
 
-              const instancePrefix = instance.id && instance.id !== 'default' ? `${providerId}-${instance.id}-` : `${providerId}-`;
-              const fullId = `${instancePrefix}${trimmedModelId}`;
+              // 直接使用 provider-modelId 格式，不包含实例前缀
+              const hasProviderPrefix = trimmedModelId.startsWith(`${providerId}-`);
+              const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':');
+              const fullId = (hasProviderPrefix || hasPathOrAlias)
+                ? trimmedModelId
+                : `${providerId}-${trimmedModelId}`;
+
               let displayName = formatModelDisplayName(providerId, trimmedModelId, instance.modelCapabilities);
-              
+
               // 如果有实例名称且不是默认配置，添加到显示名称
               if (instance.name && instance.name !== '默认配置' && instance.name !== 'default') {
                 displayName = `${instance.name} - ${displayName}`;
               }
 
-            modelList.push({
-              id: fullId,
-              name: displayName,
+              // 获取 vision 支持状态
+              // 尝试多种可能的 Key 格式
+              let supportsVision = instance.modelCapabilities?.[trimmedModelId]?.supportsVision;
+
+              if (supportsVision === undefined) {
+                // 尝试如果不带 trim 的 ID
+                supportsVision = instance.modelCapabilities?.[modelId]?.supportsVision;
+              }
+
+              if (supportsVision === undefined && providerId === 'openai') {
+                // OpenAI 特殊处理，有时候可能是 gpt-4-vision-preview 
+              }
+
+              modelList.push({
+                id: fullId,
+                name: displayName,
+                supportsVision: supportsVision,
+              });
             });
-          });
-        }
+          }
         });
       });
 
@@ -357,32 +372,37 @@ function App() {
           const hasApiKey = !instance.apiKey || (instance.apiKey && typeof instance.apiKey === 'string' && instance.apiKey.trim());
           const modelCapabilities = instance.modelCapabilities || {};
 
-        if (modelIds.length > 0 && hasApiKey) {
-          modelIds.forEach((modelId: string) => {
-            const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
-            if (!trimmedModelId) return;
+          if (modelIds.length > 0 && hasApiKey) {
+            modelIds.forEach((modelId: string) => {
+              const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim();
+              if (!trimmedModelId) return;
 
-            // 检查模型是否支持 Vision
-            const supportsVision = modelCapabilities[trimmedModelId]?.supportsVision || false;
+              // 检查模型是否支持 Vision
+              const supportsVision = modelCapabilities[trimmedModelId]?.supportsVision || false;
 
-            // 如果明确标记为支持 Vision，或者没有能力信息（兼容旧数据），则包含
-            if (supportsVision || !modelCapabilities[trimmedModelId]) {
-              const instancePrefix = instance.id && instance.id !== 'default' ? `${providerId}-${instance.id}-` : `${providerId}-`;
-              const fullId = `${instancePrefix}${trimmedModelId}`;
-              let displayName = formatModelDisplayName(providerId, trimmedModelId, modelCapabilities);
-              
-              // 如果有实例名称且不是默认配置，添加到显示名称
-              if (instance.name && instance.name !== '默认配置' && instance.name !== 'default') {
-                displayName = `${instance.name} - ${displayName}`;
+              // 如果明确标记为支持 Vision，或者没有能力信息（兼容旧数据），则包含
+              if (supportsVision || !modelCapabilities[trimmedModelId]) {
+                // 直接使用 provider-modelId 格式，不包含实例前缀
+                const hasProviderPrefix = trimmedModelId.startsWith(`${providerId}-`);
+                const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':');
+                const fullId = (hasProviderPrefix || hasPathOrAlias)
+                  ? trimmedModelId
+                  : `${providerId}-${trimmedModelId}`;
+
+                let displayName = formatModelDisplayName(providerId, trimmedModelId, modelCapabilities);
+
+                // 如果有实例名称且不是默认配置，添加到显示名称
+                if (instance.name && instance.name !== '默认配置' && instance.name !== 'default') {
+                  displayName = `${instance.name} - ${displayName}`;
+                }
+
+                modelList.push({
+                  id: fullId,
+                  name: displayName,
+                });
               }
-
-              modelList.push({
-                id: fullId,
-                name: displayName,
-              });
-            }
-          });
-        }
+            });
+          }
         });
       });
 
@@ -396,7 +416,7 @@ function App() {
   const navItems = [
     {
       id: 'optimize',
-      label: '提示词优化',
+      label: '文生图提示词优化',
       icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
     },
     {
@@ -408,11 +428,6 @@ function App() {
       id: 'config',
       label: '模型配置',
       icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-    },
-    {
-      id: 'templates',
-      label: '模板管理',
-      icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
     },
     {
       id: 'history',
@@ -433,7 +448,7 @@ function App() {
             <div className="bg-blue-600 p-1.5 rounded-lg flex-shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path><path d="M8.5 8.5v.01"></path><path d="M11.5 15.5v.01"></path><path d="M15.5 11.5v.01"></path></svg>
             </div>
-            <span className="font-bold text-lg tracking-tight hidden md:block text-gray-900">提示词优化&图片反推</span>
+            <span className="font-bold text-lg tracking-tight hidden md:block text-gray-900">文生图提示词工具</span>
           </div>
 
           <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar mask-gradient no-drag">
@@ -472,7 +487,7 @@ function App() {
         {activeTab === 'extract' && (
           <div className="absolute inset-0 w-full h-full">
             <ImageToPrompt
-              availableModels={getVisionModels() as any}
+              availableModels={getAvailableModels() as any}
               availableTemplates={image2promptTemplates as any}
               defaultTemplateId={undefined}
               templateManager={templateManager}
@@ -489,9 +504,6 @@ function App() {
               registry={registry}
             />
           </div>
-        )}
-        {activeTab === 'templates' && templateManager && (
-          <TemplateManager templateManager={templateManager} />
         )}
         {activeTab === 'history' && historyManager && (
           <HistoryPanel historyManager={historyManager} />

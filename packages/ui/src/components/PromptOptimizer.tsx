@@ -124,11 +124,12 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
     }
   }, []); // 仅初始化时执行
 
-  // 保存最近结果（仅最终内容）
+  // 保存最近结果（包括流式传输中的中间结果）
   useEffect(() => {
     const content = streamingResult || result;
     try {
       if (content) {
+        // 即使是在流式传输中，也保存中间结果，这样切换页面后回来还能看到部分内容
         localStorage.setItem(resultStorageKey, content);
         setPersistedResult(content);
       }
@@ -192,11 +193,27 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
     <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-6 p-6 overflow-hidden">
       {/* Input Section */}
       <div className="flex flex-col h-full min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-            原始想法
-          </h3>
+        <div className="p-4 border-b border-gray-200 flex flex-col gap-3 bg-gray-50/50 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              输入描述
+            </h3>
+            {chineseTemplates.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">文生图模板</span>
+                <div className="w-[22rem]">
+                  <TemplateSelector
+                    value={templateId}
+                    onChange={setTemplateId}
+                    availableTemplates={chineseTemplates}
+                    templateManager={templateManager}
+                    placeholder="默认"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           <span className="text-xs text-gray-500 font-mono">{prompt.length} 字符</span>
         </div>
 
@@ -211,23 +228,9 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
           />
         </div>
 
-        {/* Template Selection - 一个风格对应一个模板 */}
-        {chineseTemplates.length > 0 && (
-          <div className="p-4 border-b border-gray-200 bg-white">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">选择优化模板</label>
-            <TemplateSelector
-              value={templateId}
-              onChange={setTemplateId}
-              availableTemplates={chineseTemplates}
-              templateManager={templateManager}
-              placeholder="使用默认模板"
-            />
-          </div>
-        )}
-
         <textarea
           className="flex-1 w-full bg-white p-4 resize-none focus:outline-none text-gray-900 placeholder-gray-400 text-sm leading-relaxed"
-          placeholder="描述你想生成的内容（例如：'一只赛博朋克风格的猫在雨中'）..."
+          placeholder="输入简单的描述，系统将优化为专业的文生图提示词（例如：'一只赛博朋克风格的猫在雨中'）..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />
@@ -250,7 +253,7 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
               ) : (
                 <>
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4"></path><path d="m4.93 4.93 2.83 2.83"></path><path d="M2 12h4"></path><path d="m4.93 19.07 2.83-2.83"></path><path d="M12 22v-4"></path><path d="m19.07 19.07-2.83-2.83"></path><path d="M22 12h-4"></path><path d="m19.07 4.93-2.83 2.83"></path></svg>
-                  一键流式优化
+                  优化提示词
                 </>
               )}
             </button>
@@ -263,7 +266,7 @@ export const PromptOptimizer: React.FC<PromptOptimizerProps> = ({
         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-            优化结果
+            优化后的提示词
           </h3>
           {finalContent && (
             <button

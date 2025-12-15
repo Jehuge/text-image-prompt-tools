@@ -38,6 +38,7 @@ export const image2promptGeneral: Template = {
 - 保持描述的连贯性和可读性
 - 确保描述能够用于图像生成
 - 严格遵守主体判定逻辑，不虚构不存在的内容
+- 如果用户提供了额外指令（如风格/氛围/重点），在不违背图像事实的前提下尽量满足
 
 ## Constraints
 - 只描述图像中实际存在的内容
@@ -59,7 +60,7 @@ export const image2promptGeneral: Template = {
     },
     {
       role: 'user',
-      content: '请从以下图像中提取提示词：\n[图像]',
+      content: '请从以下图像中提取提示词：\n[图像]\n\n如有额外指令，请一并满足：\n{{instructions}}',
     },
   ],
   metadata: {

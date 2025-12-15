@@ -27,6 +27,7 @@ export interface ImageToPromptRecord {
   prompt: string;
   modelKey: string;
   modelName?: string;
+  instructions?: string;
   timestamp: number;
 }
 

@@ -112,27 +112,21 @@ export default function ModelSelectorPanel({ registry }: ModelSelectorPanelProps
           modelIds.forEach((modelId: string) => {
             const trimmedModelId = typeof modelId === 'string' ? modelId.trim() : String(modelId).trim()
             if (!trimmedModelId) return
-              
-              // 新格式：ID 包含实例 ID，格式为 provider-instanceId-modelId
-              const instancePrefix = instance.id && instance.id !== 'default' ? `${providerId}-${instance.id}-` : `${providerId}-`
-              let optionId: string
-              if (trimmedModelId.startsWith(instancePrefix)) {
-                optionId = trimmedModelId
-              } else if (trimmedModelId.startsWith(`${providerId}-`)) {
-                const modelIdWithoutPrefix = trimmedModelId.substring(providerId.length + 1)
-                optionId = `${instancePrefix}${modelIdWithoutPrefix}`
-              } else {
-                optionId = `${instancePrefix}${trimmedModelId}`
-              }
             
-            // 模型名称处理
+            // 直接使用 provider-modelId 格式，不包含实例前缀
+            // 实例信息通过 connectionConfig.baseURL 区分
+            const hasProviderPrefix = trimmedModelId.startsWith(`${providerId}-`)
+            const hasPathOrAlias = trimmedModelId.includes('/') || trimmedModelId.includes(':')
+            
+            // 生成 ID：如果已经有 provider 前缀或路径，直接使用；否则添加 provider 前缀
+            const optionId = (hasProviderPrefix || hasPathOrAlias)
+              ? trimmedModelId
+              : `${providerId}-${trimmedModelId}`
+            
+            // 模型名称处理：移除 provider 前缀用于显示
             let modelName = trimmedModelId
-            
-              // 移除实例前缀（如果存在）用于显示
-              if (modelName.startsWith(instancePrefix)) {
-                modelName = modelName.substring(instancePrefix.length)
-              } else if (modelName.startsWith(`${providerId}-`)) {
-                modelName = modelName.substring(providerId.length + 1)
+            if (modelName.startsWith(`${providerId}-`)) {
+              modelName = modelName.substring(providerId.length + 1)
             }
             
             // 处理特殊格式的模型名称（如 hf.co/unsloth/Qwen3-4B-GGUF:Q6_K_XL）

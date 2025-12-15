@@ -326,13 +326,13 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
         return
       }
 
-      // 保存模型能力信息（从真实获取的模型列表中）
-      const modelCapabilities: Record<string, { supportsVision: boolean }> = {}
+      // 保存模型能力信息（从用户手动勾选的状态中读取）
+      const modelCapabilities: Record<string, { supportsVision: boolean }> = currentInstance.modelCapabilities || {}
+      // 确保所有选中的模型都有能力信息记录（如果用户没有手动设置，默认为 false）
       currentInstance.models.forEach((modelId: string) => {
-        const model = availableModels.find((m: ModelItem) => m.id === modelId)
-        if (model) {
+        if (!modelCapabilities[modelId]) {
           modelCapabilities[modelId] = {
-            supportsVision: model.supportsVision || false,
+            supportsVision: false,
           }
         }
       })
@@ -375,7 +375,7 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                 name: modelDef?.name || trimmedModelId,
                 providerId: selectedProvider,
                 capabilities: {
-                  supportsVision: modelDef?.supportsVision || false,
+                  supportsVision: modelCapabilities[modelId]?.supportsVision || false, // 从用户手动勾选的状态中读取
                   supportsTools: false,
                   maxContextLength: 128000 // 默认值
                 }
@@ -436,6 +436,18 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
       localStorage.setItem('modelConfigs', JSON.stringify(updatedConfigs))
       setConfigs(updatedConfigs)
 
+      // 清除模型列表缓存，强制重新加载
+      const cacheKey = `${selectedProvider}-${currentInstance.id}-${currentInstance.apiKey || ''}-${currentInstance.baseUrl || ''}`
+      delete modelsCacheRef.current[cacheKey]
+      try {
+        const cacheStorageKey = 'modelListCache'
+        const allCache = JSON.parse(localStorage.getItem(cacheStorageKey) || '{}')
+        delete allCache[cacheKey]
+        localStorage.setItem(cacheStorageKey, JSON.stringify(allCache))
+      } catch (e) {
+        console.warn('清除模型列表缓存失败:', e)
+      }
+
       // 显示保存的配置信息
       const selectedModelNames = currentInstance.models
         .map((modelId: string) => {
@@ -486,10 +498,47 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
       ? currentModels.filter((id: string) => id !== modelId)
       : [...currentModels, modelId]
 
+    // 如果取消选择模型，同时清除其视觉支持配置
+    const updatedCapabilities = { ...(currentInstance.modelCapabilities || {}) }
+    if (isSelected) {
+      delete updatedCapabilities[modelId]
+    }
+
     const providerConfig = configs[selectedProvider] || { provider: selectedProvider, instances: [], defaultInstanceId: undefined }
     const updatedInstances = providerConfig.instances.map(inst => 
       inst.id === currentInstance.id 
-        ? { ...inst, models: updatedModels, model: updatedModels.length > 0 ? updatedModels[0] : '' }
+        ? { ...inst, models: updatedModels, model: updatedModels.length > 0 ? updatedModels[0] : '', modelCapabilities: updatedCapabilities }
+        : inst
+    )
+
+    setConfigs((prev) => ({
+      ...prev,
+      [selectedProvider]: {
+        ...providerConfig,
+        instances: updatedInstances,
+      },
+    }))
+  }
+
+  // 处理视觉支持切换
+  const handleVisionToggle = (modelId: string, e: React.SyntheticEvent) => {
+    e.stopPropagation() // 阻止事件冒泡，避免触发模型选择
+    if (!currentInstance) return
+
+    const currentCapabilities = currentInstance.modelCapabilities || {}
+    const currentVision = currentCapabilities[modelId]?.supportsVision || false
+
+    const updatedCapabilities = {
+      ...currentCapabilities,
+      [modelId]: {
+        supportsVision: !currentVision,
+      },
+    }
+
+    const providerConfig = configs[selectedProvider] || { provider: selectedProvider, instances: [], defaultInstanceId: undefined }
+    const updatedInstances = providerConfig.instances.map(inst => 
+      inst.id === currentInstance.id 
+        ? { ...inst, modelCapabilities: updatedCapabilities }
         : inst
     )
 
@@ -872,49 +921,65 @@ export const ModelConfig: React.FC<ModelConfigProps> = ({
                   <div className="space-y-2">
                     {availableModels.map((model) => {
                       const isSelected = (currentInstance.models || []).includes(model.id)
+                      const supportsVision = currentInstance.modelCapabilities?.[model.id]?.supportsVision || false
                       return (
-                        <label
+                        <div
                           key={model.id}
-                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isSelected
+                          className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${isSelected
                             ? 'bg-blue-50 border border-blue-200'
                             : 'hover:bg-gray-100 border border-transparent'
                             }`}
-                          onClick={(e) => {
-                            // 防止点击 label 时触发两次
+                        >
+                          <label className="flex items-center gap-3 flex-1 cursor-pointer" onClick={(e) => {
                             e.preventDefault()
                             handleModelToggle(model.id)
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              handleModelToggle(model.id)
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-sm font-medium text-gray-900">{model.name}</div>
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-xs border border-gray-200">
-                                <FileText className="w-3 h-3" />
-                                text
-                              </span>
-                              {model.supportsVision && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs border border-blue-200">
-                                  <ImageIcon className="w-3 h-3" />
-                                  视觉
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                handleModelToggle(model.id)
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm font-medium text-gray-900">{model.name}</div>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-xs border border-gray-200">
+                                  <FileText className="w-3 h-3" />
+                                  文本
                                 </span>
-                              )}
+                                {supportsVision && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs border border-blue-200">
+                                    <ImageIcon className="w-3 h-3" />
+                                    视觉
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500">{model.provider}</div>
                             </div>
-                            <div className="text-xs text-gray-500">{model.provider}</div>
-                          </div>
+                          </label>
                           {isSelected && (
-                            <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                            <div className="flex items-center gap-2 shrink-0">
+                              <label className="flex items-center gap-1 cursor-pointer" onClick={(e) => handleVisionToggle(model.id, e)}>
+                                <input
+                                  type="checkbox"
+                                  checked={supportsVision}
+                                  onChange={(e) => {
+                                    e.stopPropagation()
+                                    handleVisionToggle(model.id, e)
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span className="text-xs text-gray-600 whitespace-nowrap">支持视觉</span>
+                              </label>
+                              <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                            </div>
                           )}
-                        </label>
+                        </div>
                       )
                     })}
                   </div>

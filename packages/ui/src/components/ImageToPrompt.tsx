@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useImageToPrompt } from '../hooks/useImageToPrompt';
 import { ModelSelector } from './ModelSelector';
 import { TemplateSelector } from './TemplateSelector';
@@ -34,12 +34,27 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
 }) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
-  const [model, setModel] = useState(defaultModel);
+  const [instructions, setInstructions] = useState('');
+  const pasteAreaRef = useRef<HTMLTextAreaElement>(null);
+  // 初始化时从 localStorage 恢复模型选择
+  const [model, setModel] = useState(() => {
+    // 优先从 localStorage 恢复，如果没有则使用 defaultModel
+    try {
+      const saved = localStorage.getItem('selectedImageModel');
+      return saved || defaultModel;
+    } catch (e) {
+      return defaultModel;
+    }
+  });
   const [templateId, setTemplateId] = useState<string | undefined>(defaultTemplateId);
+  const [persistedResult, setPersistedResult] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { extract, loading, error, result } = useImageToPrompt(imageService, historyManager);
 
   const templateStorageKey = 'image-prompt-template';
+  const imagePreviewStorageKey = 'image-prompt-preview';
+  const resultStorageKey = 'image-prompt-result';
+  const instructionStorageKey = 'image-prompt-instructions';
 
   // 过滤中文模板
   const chineseTemplates = availableTemplates.filter(t => t.language === 'zh');
@@ -69,20 +84,117 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
     }
   }, [templateId]);
 
+  // 加载图片预览和结果
+  useEffect(() => {
+    try {
+      const savedPreview = localStorage.getItem(imagePreviewStorageKey);
+      if (savedPreview) {
+        setImagePreview(savedPreview);
+      }
+      const savedResult = localStorage.getItem(resultStorageKey);
+      if (savedResult) {
+        setPersistedResult(savedResult);
+      }
+      const savedInstructions = localStorage.getItem(instructionStorageKey);
+      if (savedInstructions) {
+        setInstructions(savedInstructions);
+      }
+    } catch (e) {
+      console.warn('加载图片预览和结果失败', e);
+    }
+  }, []);
+
+  // 保存图片预览
+  useEffect(() => {
+    try {
+      if (imagePreview) {
+        localStorage.setItem(imagePreviewStorageKey, imagePreview);
+      } else {
+        localStorage.removeItem(imagePreviewStorageKey);
+      }
+    } catch (e) {
+      console.warn('保存图片预览失败', e);
+    }
+  }, [imagePreview]);
+
+  // 保存额外指令
+  useEffect(() => {
+    try {
+      if (instructions) {
+        localStorage.setItem(instructionStorageKey, instructions);
+      } else {
+        localStorage.removeItem(instructionStorageKey);
+      }
+    } catch (e) {
+      console.warn('保存额外指令失败', e);
+    }
+  }, [instructions]);
+
+  // 保存结果
+  useEffect(() => {
+    try {
+      if (result) {
+        localStorage.setItem(resultStorageKey, result);
+        setPersistedResult(result);
+      }
+    } catch (e) {
+      console.warn('保存结果失败', e);
+    }
+  }, [result]);
+
+  const loadImageFile = useCallback((file: File) => {
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      loadImageFile(file);
     }
   };
 
+  const handlePasteIntoBox = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = event.clipboardData?.items;
+    if (!items?.length) return;
+
+    const imageItem = Array.from(items).find((item) => item.type.startsWith('image/'));
+    if (!imageItem) return;
+
+    const file = imageItem.getAsFile();
+    if (!file) return;
+
+    event.preventDefault();
+    loadImageFile(file);
+    if (pasteAreaRef.current) {
+      pasteAreaRef.current.value = '';
+    }
+  };
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items?.length) return;
+
+      const imageItem = Array.from(items).find((item) => item.type.startsWith('image/'));
+      if (!imageItem) return;
+
+      const file = imageItem.getAsFile();
+      if (!file) return;
+
+      loadImageFile(file);
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [loadImageFile]);
+
   const handleExtract = async () => {
-    if (!imageFile || !imagePreview) {
+    if (!imagePreview) {
       alert('请先选择图片');
       return;
     }
@@ -90,15 +202,16 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
       alert('请先选择模型');
       return;
     }
-    const prompt = await extract(imagePreview, model, templateId);
+    const prompt = await extract(imagePreview, model, templateId, instructions);
     if (prompt && onExtracted) {
       onExtracted(prompt);
     }
   };
 
   const copyToClipboard = () => {
-    if (result) {
-      navigator.clipboard.writeText(result);
+    const content = result || persistedResult;
+    if (content) {
+      navigator.clipboard.writeText(content);
     }
   };
 
@@ -106,11 +219,27 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
     <div className="w-full h-full grid grid-cols-1 md:grid-cols-2 gap-6 p-6 overflow-hidden">
       {/* Input Section */}
       <div className="flex flex-col h-full min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-200 bg-gray-50/50">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-            参考图片
-          </h3>
+        <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              参考图片
+            </h3>
+            {chineseTemplates.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">反推模板</span>
+                <div className="w-[22rem]">
+                  <TemplateSelector
+                    value={templateId}
+                    onChange={setTemplateId}
+                    availableTemplates={chineseTemplates}
+                    templateManager={templateManager}
+                    placeholder="默认"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Model Selection */}
@@ -124,19 +253,28 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
           />
         </div>
 
-        {/* Template Selection */}
-        {chineseTemplates.length > 0 && (
-          <div className="p-4 border-b border-gray-200 bg-white">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">选择反推模板</label>
-            <TemplateSelector
-              value={templateId}
-              onChange={setTemplateId}
-              availableTemplates={chineseTemplates}
-              templateManager={templateManager}
-              placeholder="使用默认模板"
+        {/* Paste & Instructions Row */}
+        <div className="p-4 border-b border-gray-200 bg-white grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">粘贴图片区域</label>
+            <textarea
+              ref={pasteAreaRef}
+              onPaste={handlePasteIntoBox}
+              placeholder="按 Ctrl/Cmd + V 粘贴截图或图片，文本会被忽略"
+              className="w-full h-24 rounded-lg border border-gray-200 bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm p-3 resize-none transition-colors"
             />
           </div>
-        )}
+
+          <div className="flex flex-col">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">额外指令（风格/侧重等，可选）</label>
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="如：赛博朋克风格 / 更强调暖色氛围 / 保留写实"
+              className="w-full h-24 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm p-3 resize-none transition-colors"
+            />
+          </div>
+        </div>
 
         <div className="flex-1 p-6 flex flex-col items-center justify-center bg-white min-h-0">
           <input
@@ -153,7 +291,7 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
               className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-all"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 mb-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-              <p className="text-gray-600 font-medium">点击上传图片</p>
+              <p className="text-gray-600 font-medium">点击上传图片或直接粘贴</p>
               <p className="text-gray-400 text-sm mt-2">支持 JPG, PNG, WebP</p>
             </div>
           ) : (
@@ -164,6 +302,7 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
                   setImageFile(null);
                   setImagePreview('');
                   if (fileInputRef.current) fileInputRef.current.value = '';
+                  localStorage.removeItem(imagePreviewStorageKey);
                 }}
                 className="text-xs text-red-600 hover:text-red-700 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
@@ -176,7 +315,7 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
         <div className="p-4 border-t border-gray-200 bg-white">
           <button
             onClick={handleExtract}
-            disabled={loading || !imageFile || !model}
+            disabled={loading || !imagePreview || !model}
             className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all duration-200 flex justify-center items-center gap-2 shadow-sm"
           >
             {loading ? (
@@ -204,7 +343,7 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             分析结果
           </h3>
-          {result && (
+          {(result || persistedResult) && (
             <button
               onClick={copyToClipboard}
               className="text-gray-500 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded transition-all flex items-center gap-1 text-xs font-medium"
@@ -220,14 +359,14 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
             <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg text-sm">
               错误: {error.message}
             </div>
-          ) : !result && !loading ? (
+          ) : !result && !persistedResult && !loading ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-50"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
               <p className="text-sm">分析结果将显示在这里</p>
             </div>
           ) : (
             <div className="whitespace-pre-wrap font-mono text-sm text-gray-800 leading-relaxed">
-              {result}
+              {result || persistedResult}
               {loading && <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse" />}
             </div>
           )}

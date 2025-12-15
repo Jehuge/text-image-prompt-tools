@@ -32,7 +32,8 @@ export function useImageToPrompt(
   const extract = async (
     imageUrl: string,
     modelKey: string,
-    templateId?: string
+    templateId?: string,
+    instructions?: string
   ): Promise<string | null> => {
     const service = getImageService();
     if (!service) {
@@ -49,6 +50,7 @@ export function useImageToPrompt(
         imageUrl,
         modelKey,
         templateId,
+        instructions,
       };
       const response = await service.imageToPrompt(request);
       setResult(response.prompt);
@@ -62,6 +64,7 @@ export function useImageToPrompt(
           imageUrl: imageUrl,
           prompt: response.prompt,
           modelKey,
+          instructions,
           timestamp: Date.now(),
         };
         await historyMgr.addRecord(record);

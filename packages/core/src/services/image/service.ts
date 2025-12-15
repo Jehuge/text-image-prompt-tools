@@ -10,6 +10,7 @@ export interface ImageToPromptRequest {
   imageUrl: string; // base64 或 URL
   modelKey: string;
   templateId?: string;
+  instructions?: string; // 用户额外指令
 }
 
 /**
@@ -66,12 +67,21 @@ export class ImageService implements IImageService {
     const messages: Message[] = template.content.map((msg) => {
       if (msg.role === 'user' && msg.content.includes('[图像]')) {
         // 替换 [图像] 为实际图像内容
+        const instructionText = request.instructions?.trim();
+        const withImage = msg.content.replace('[图像]', '请从以下图像中提取提示词：');
+        const withInstructionPlaceholder = withImage.includes('{{instructions}}')
+          ? withImage.replace('{{instructions}}', instructionText || '（无额外指令）')
+          : withImage;
+        const combinedText =
+          instructionText && !withImage.includes('{{instructions}}')
+            ? `${withInstructionPlaceholder}\n用户额外指令：${instructionText}`
+            : withInstructionPlaceholder;
         return {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: msg.content.replace('[图像]', '请从以下图像中提取提示词：'),
+              text: combinedText,
             },
             {
               type: 'image_url',
