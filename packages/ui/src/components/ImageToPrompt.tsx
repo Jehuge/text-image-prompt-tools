@@ -21,6 +21,34 @@ export interface ImageToPromptProps {
   historyManager?: HistoryManager;
 }
 
+const COMMON_RATIOS = [
+  { label: '1:1', ratio: 1 / 1 },
+  { label: '2:3', ratio: 2 / 3 },
+  { label: '3:2', ratio: 3 / 2 },
+  { label: '3:4', ratio: 3 / 4 },
+  { label: '4:3', ratio: 4 / 3 },
+  { label: '16:9', ratio: 16 / 9 },
+  { label: '9:16', ratio: 9 / 16 },
+  { label: '16:10', ratio: 16 / 10 },
+  { label: '10:16', ratio: 10 / 16 },
+  { label: '21:9', ratio: 21 / 9 },
+];
+
+const getClosestRatio = (width: number, height: number): string => {
+  const currentRatio = width / height;
+  let closest = COMMON_RATIOS[0];
+  let minDiff = Math.abs(currentRatio - closest.ratio);
+
+  for (let i = 1; i < COMMON_RATIOS.length; i++) {
+    const diff = Math.abs(currentRatio - COMMON_RATIOS[i].ratio);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = COMMON_RATIOS[i];
+    }
+  }
+
+  return closest.label;
+};
 
 export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
   defaultModel = '',
@@ -48,6 +76,8 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
   });
   const [templateId, setTemplateId] = useState<string | undefined>(defaultTemplateId);
   const [persistedResult, setPersistedResult] = useState<string>('');
+  const [resolution, setResolution] = useState<{ width: number; height: number } | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { extract, loading, error, result } = useImageToPrompt(imageService, historyManager);
 
@@ -90,6 +120,16 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
       const savedPreview = localStorage.getItem(imagePreviewStorageKey);
       if (savedPreview) {
         setImagePreview(savedPreview);
+
+        // 如果有预览图，重新分析一次分辨率（因为 localStorage 没存分辨率）
+        const img = new Image();
+        img.onload = () => {
+          const width = img.width;
+          const height = img.height;
+          setResolution({ width, height });
+          setAspectRatio(getClosestRatio(width, height));
+        };
+        img.src = savedPreview;
       }
       const savedResult = localStorage.getItem(resultStorageKey);
       if (savedResult) {
@@ -146,7 +186,18 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
     setImageFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result as string);
+      const base64 = reader.result as string;
+      setImagePreview(base64);
+
+      // 分析图片分辨率和比例
+      const img = new Image();
+      img.onload = () => {
+        const width = img.width;
+        const height = img.height;
+        setResolution({ width, height });
+        setAspectRatio(getClosestRatio(width, height));
+      };
+      img.src = base64;
     };
     reader.readAsDataURL(file);
   }, []);
@@ -202,7 +253,10 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
       alert('请先选择模型');
       return;
     }
-    const prompt = await extract(imagePreview, model, templateId, instructions);
+    const prompt = await extract(imagePreview, model, templateId, instructions, {
+      resolution: resolution || undefined,
+      aspectRatio: aspectRatio || undefined,
+    });
     if (prompt && onExtracted) {
       onExtracted(prompt);
     }
@@ -296,11 +350,27 @@ export const ImageToPrompt: React.FC<ImageToPromptProps> = ({
             </div>
           ) : (
             <div className="relative w-full h-full flex flex-col items-center justify-center">
-              <img src={imagePreview} alt="Upload preview" className="max-h-full max-w-full object-contain rounded-lg shadow-sm mb-4" />
+              <img src={imagePreview} alt="Upload preview" className="max-h-[calc(100%-4rem)] max-w-full object-contain rounded-lg shadow-sm mb-2" />
+              
+              {resolution && (
+                <div className="flex items-center gap-3 mb-3 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
+                  <span className="text-xs font-medium text-blue-700 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+                    分辨率: {resolution.width} × {resolution.height}
+                  </span>
+                  <span className="text-xs font-medium text-blue-700 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"></path><polyline points="7 12 12 7 17 12"></polyline><polyline points="7 17 12 12 17 17"></polyline></svg>
+                    比例: {aspectRatio}
+                  </span>
+                </div>
+              )}
+
               <button
                 onClick={() => {
                   setImageFile(null);
                   setImagePreview('');
+                  setResolution(null);
+                  setAspectRatio('');
                   if (fileInputRef.current) fileInputRef.current.value = '';
                   localStorage.removeItem(imagePreviewStorageKey);
                 }}

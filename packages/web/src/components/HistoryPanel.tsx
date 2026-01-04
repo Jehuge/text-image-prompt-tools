@@ -191,6 +191,20 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                         {record.prompt}
                       </p>
                     </div>
+                    {(record.resolution || record.aspectRatio) && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {record.resolution && (
+                          <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">
+                            {record.resolution.width} × {record.resolution.height}
+                          </span>
+                        )}
+                        {record.aspectRatio && (
+                          <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">
+                            比例: {record.aspectRatio}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
 

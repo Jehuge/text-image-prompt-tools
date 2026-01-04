@@ -29,6 +29,8 @@ export interface ImageToPromptRecord {
   modelName?: string;
   instructions?: string;
   timestamp: number;
+  resolution?: { width: number; height: number };
+  aspectRatio?: string;
 }
 
 /**

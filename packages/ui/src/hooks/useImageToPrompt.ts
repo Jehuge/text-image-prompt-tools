@@ -33,7 +33,11 @@ export function useImageToPrompt(
     imageUrl: string,
     modelKey: string,
     templateId?: string,
-    instructions?: string
+    instructions?: string,
+    metadata?: {
+      resolution?: { width: number; height: number };
+      aspectRatio?: string;
+    }
   ): Promise<string | null> => {
     const service = getImageService();
     if (!service) {
@@ -66,6 +70,8 @@ export function useImageToPrompt(
           modelKey,
           instructions,
           timestamp: Date.now(),
+          resolution: metadata?.resolution,
+          aspectRatio: metadata?.aspectRatio,
         };
         await historyMgr.addRecord(record);
       }
